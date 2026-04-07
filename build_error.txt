@@ -1,39 +1,16 @@
-[36mvite v8.0.3 [32mbuilding client environment for production...[36m[39m
-[2Ktransforming...✓ 1785 modules transformed.
-rendering chunks...
-computing gzip size...
-dist/index.html                   2.01 kB │ gzip:   0.85 kB
-dist/assets/index-BOtIbrJk.css   38.16 kB │ gzip:   6.67 kB
-dist/assets/index-5wtxiCMg.js   509.73 kB │ gzip: 136.68 kB
-
-[33m[plugin builtin:vite-reporter] 
-(!) Some chunks are larger than 500 kB after minification. Consider:
-- Using dynamic import() to code-split the application
-- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
-- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
-[31m✗[39m Build failed in 401ms
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 1782 modules transformed.
+[31mx[39m Build failed in 1.66s
 [31merror during build:
-[31mBuild failed with 1 error:
-
-Error: [vite]: Rolldown failed to resolve import "tslib" from "C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/@supabase/functions-js/dist/module/FunctionsClient.js".
-This is most likely unintended because it can break your application at runtime.
-If you do want to externalize this module explicitly add it to
-`build.rollupOptions.external`
-    at viteLog (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/node.js:32942:57)
-    at file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/node.js:32978:71
-    at onwarn (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/@vitejs/plugin-react/dist/index.js:40:7)
-    at file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/node.js:32978:28
-    at onRollupLog (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/node.js:32973:63)
-    at onLog (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/node.js:32743:4)
-    at file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rolldown/dist/shared/rolldown-build-CPrIX9V6.mjs:49:26
-    at logger (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rolldown/dist/shared/rolldown-build-CPrIX9V6.mjs:40:3)
-    at onLog (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rolldown/dist/shared/bindingify-input-options-e7ze4hPR.mjs:1972:32)[31m
-    at aggregateBindingErrorsIntoJsError (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rolldown/dist/shared/error-BLhcSyeg.mjs:48:18)
-    at unwrapBindingResult (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rolldown/dist/shared/error-BLhcSyeg.mjs:18:128)
-    at #build (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rolldown/dist/shared/rolldown-build-CPrIX9V6.mjs:3313:34)
-    at async buildEnvironment (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/node.js:32849:64)
-    at async Object.build (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/node.js:33271:19)
-    at async Object.buildApp (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/node.js:33268:153)
-    at async CAC.<anonymous> (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/cli.js:778:3) {
-  errors: [Getter/Setter]
-}[39m
+[31m[commonjs--resolver] Failed to resolve entry for package "tslib". The package may have incorrect main/module/exports specified in its package.json.[31m
+    at packageEntryFailure (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:46638:15)
+    at resolvePackageEntry (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:46635:3)
+    at tryNodeResolve (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:46451:16)
+    at Object.resolveId (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:46201:19)
+    at file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rollup/dist/es/shared/node-entry.js:22967:40
+    at async PluginDriver.hookFirstAndGetPlugin (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rollup/dist/es/shared/node-entry.js:22849:28)
+    at async resolveId (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rollup/dist/es/shared/node-entry.js:21300:26)
+    at async ModuleLoader.resolveId (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rollup/dist/es/shared/node-entry.js:21746:15)
+    at async Object.resolveId (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:12834:10)
+    at async PluginDriver.hookFirstAndGetPlugin (file:///C:/Users/Jeevesh/OneDrive/Desktop/Maifil/node_modules/rollup/dist/es/shared/node-entry.js:22849:28)[39m
