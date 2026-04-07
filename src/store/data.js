@@ -196,14 +196,14 @@ export async function cancelOrder(orderId, tableId) {
 }
 
 export async function addItemToOrder(orderId, menuItem) {
-  // Use pure snake_case for database schema, mapping from camelCase UI variables
+  // Database strictly uses camelCase for the columns
   return dbInsert('order_items', {
-    order_id: orderId,
-    menu_item_id: menuItem.id,
+    orderId: orderId,
+    menuItemId: menuItem.id,
     name: menuItem.name,
     price: menuItem.price,
     quantity: 1,
-    category_type: menuItem.categoryType || 'bar'
+    categoryType: menuItem.categoryType || 'bar'
   });
 }
 
@@ -212,8 +212,8 @@ export async function generateBill(orderId, paymentMode, discount) {
   const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).single();
   if (orderErr) throw orderErr;
   
-  // Must fetch with or filtering since existing data might only have camelCase or snakeCase
-  const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').or(`orderId.eq.${orderId},order_id.eq.${orderId}`);
+  // orderId is the actual column name in the DB
+  const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('orderId', orderId);
   if (itemsErr) throw itemsErr;
 
   const { data: configData } = await supabase.from('config').select('*').eq('restaurant_id', _restaurantId);
@@ -236,24 +236,23 @@ export async function generateBill(orderId, paymentMode, discount) {
   const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
   
-  // Use pure snake_case
+  // Use camelCase
   const bill = await dbInsert('bills', {
     id: billId,
-    order_id: orderId,
-    bill_number: billNumber,
+    orderId: orderId,
+    billNumber: billNumber,
     total,
-    payment_mode: paymentMode,
-    session_id: activeSession ? activeSession.id : null,
-    created_at: new Date().toISOString()
+    paymentMode: paymentMode,
+    createdAt: new Date().toISOString()
   });
 
-  // Pure snake_case for bill items
+  // Use camelCase for bill items
   const billItems = items.map(item => ({
-    bill_id: billId,
+    billId: billId,
     name: item.name,
     price: item.price,
     quantity: item.quantity || item.qty || 0,
-    category_type: item.categoryType || item.category_type || 'bar',
+    categoryType: item.categoryType || item.category_type || 'bar',
     restaurant_id: _restaurantId
   }));
   
