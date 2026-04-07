@@ -256,9 +256,9 @@ export async function getOrderForTable(tableId) {
     .eq('restaurant_id', _restaurantId)
     .eq('tableId', tableId)
     .eq('status', 'active')
-    .order('created_at', { ascending: false })
     .limit(1);
     
+  if (error) console.error("🚨 GET ORDER ERROR:", error);
   if (error || !orders || orders.length === 0) return null;
   const order = orders[0];
   

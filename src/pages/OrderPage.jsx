@@ -42,6 +42,7 @@ export default function OrderPage() {
       setOrder(existingOrder);
     } catch (e) {
       console.error('Load order error:', e);
+      addToast('Order loading failed: ' + (e.message || 'Unknown'), 'error');
       setOrder(null);
     } finally {
       setOrderLoading(false);
