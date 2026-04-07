@@ -8,7 +8,7 @@ import { CreditCard, Banknote, Smartphone, ArrowLeft, Printer } from 'lucide-rea
 export default function BillingPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { config, refresh, orders, refreshing = false } = useApp();
+  const { config = {}, refresh, orders = [], refreshing = false } = useApp();
   const { addToast } = useToast();
 
   const order = (orders || []).find(o => o.id === orderId);

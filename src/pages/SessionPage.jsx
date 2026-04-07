@@ -5,7 +5,7 @@ import { startSession, endSession, getCurrentSession, getSessionBills, getSplitR
 import { Play, Square, Clock, DollarSign, Printer, TrendingUp, BarChart3, Coffee, Wine, Calendar, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 
 export default function SessionPage() {
-  const { currentUser, currentSession, refresh, config, sessions: allSessions, categories, bills, refreshing = false } = useApp();
+  const { currentUser, currentSession, refresh, config = {}, sessions: allSessions = [], categories = [], bills = [], refreshing = false } = useApp();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [showEndConfirm, setShowEndConfirm] = useState(false);

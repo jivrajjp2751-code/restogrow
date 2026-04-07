@@ -1850,4 +1850,123 @@ ul, ol { list-style: none; }
   color: rgba(255, 255, 255, 0.5); font-weight: 500;
 }
 
+/* ===== APP LOADER (Centered Full-Screen) ===== */
+.resto-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100%;
+  background: var(--bg-primary);
+  gap: 16px;
+}
+
+.resto-loader-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: fadeIn 0.5s ease;
+}
+
+/* ===== SPIN ANIMATION ===== */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin { animation: spin 1s linear infinite; }
+
+/* ===== STAFF SYNC BUTTON ===== */
+.staff-sync-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+}
+.staff-sync-btn:active {
+  background: var(--brand-primary);
+  color: white;
+}
+.staff-sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== STAFF BAR/KITCHEN TOGGLE ===== */
+.staff-menu-toggle {
+  display: flex;
+  gap: 0;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.staff-toggle-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  transition: var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+.staff-toggle-btn:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  border-right: none;
+}
+.staff-toggle-btn:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+.staff-toggle-btn.active.bar {
+  background: var(--brand-primary);
+  color: white;
+  border-color: var(--brand-primary);
+}
+.staff-toggle-btn.active.kitchen {
+  background: var(--brand-warning);
+  color: #0C0D12;
+  border-color: var(--brand-warning);
+}
+
+/* ===== STAFF LOADING & EMPTY STATE ===== */
+.staff-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 16px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.staff-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--text-tertiary);
+  text-align: center;
+  font-size: 12px;
+  gap: 8px;
+}
 

@@ -5,7 +5,7 @@ import { updateTable, createOrder, getOrderForTable, addTable, deleteTable, addS
 import { Plus, Edit3, Trash2, Settings, X } from 'lucide-react';
 
 export default function TablesPage() {
-  const { tables, sections, refresh, currentSession } = useApp();
+  const { tables = [], sections = [], refresh, currentSession } = useApp();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [filter, setFilter] = useState('all');

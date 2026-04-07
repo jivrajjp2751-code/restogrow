@@ -1,23 +1,20 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
-import { useSearchParams } from 'react-router-dom';
 import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
-  updateTable, createOrder, generateBill,
+  createOrder, generateBill,
 } from '../store/data';
 import { printSplitKOT, printBillDirect } from '../utils/print';
 import {
   Search, Plus, Minus, Trash2, ArrowLeft, Printer, Wine, Coffee,
-  X, StickyNote, LogOut, Receipt, CreditCard, Banknote, Smartphone
+  X, StickyNote, LogOut, Receipt, CreditCard, Banknote, Smartphone, RefreshCw
 } from 'lucide-react';
 
 export default function StaffMobileDashboard() {
-  const { tables, sections, menuItems, categories, config, refresh, currentSession, logout, refreshing = false } = useApp();
+  const { tables = [], sections = [], menuItems = [], categories = [], config = {}, refresh, currentSession, logout, refreshing = false } = useApp();
   const { addToast } = useToast();
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selectedTableId = searchParams.get('tableId');
-  
+  const [selectedTableId, setSelectedTableId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMenuTab, setActiveMenuTab] = useState('bar');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -29,167 +26,165 @@ export default function StaffMobileDashboard() {
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [discount, setDiscount] = useState(0);
   const [order, setOrder] = useState(null);
-  const [itemAdding, setItemAdding] = useState(false); // To prevent double clicks
+  const [busy, setBusy] = useState(false);
 
-  const selectedTable = useMemo(() => 
-    tables.find(t => t.id === selectedTableId), 
+  const selectedTable = useMemo(() =>
+    tables.find(t => t.id === selectedTableId) || null,
   [tables, selectedTableId]);
 
-  // Load order for selected table
+  // Load order when table selected
   const loadOrder = useCallback(async () => {
-    if (selectedTableId) {
-      try {
-        const existingOrder = await getOrderForTable(selectedTableId);
-        setOrder(existingOrder);
-      } catch { setOrder(null); }
-    } else {
-      setOrder(null);
-    }
+    if (!selectedTableId) { setOrder(null); return; }
+    try {
+      const o = await getOrderForTable(selectedTableId);
+      setOrder(o);
+    } catch { setOrder(null); }
   }, [selectedTableId]);
 
-  useEffect(() => { 
-    loadOrder(); 
-  }, [selectedTableId, tables, loadOrder]);
+  useEffect(() => { loadOrder(); }, [loadOrder]);
 
-  const refreshOrder = useCallback(async () => {
-    await loadOrder();
-    refresh();
-  }, [loadOrder, refresh]);
+  // Reload order when tables data refreshes (realtime)
+  useEffect(() => {
+    if (selectedTableId) loadOrder();
+  }, [tables]); // eslint-disable-line
 
-  const barCategories = categories.filter(c => c.type === 'bar');
-  const kitchenCategories = categories.filter(c => c.type === 'kitchen');
+  const safeItems = order?.items || [];
+
+  const barCategories = useMemo(() => (categories || []).filter(c => c.type === 'bar'), [categories]);
+  const kitchenCategories = useMemo(() => (categories || []).filter(c => c.type === 'kitchen'), [categories]);
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const tabCats = activeMenuTab === 'bar' ? barCategories : kitchenCategories;
     const tabCatIds = tabCats.map(c => c.id);
-    let items = menuItems.filter(i => tabCatIds.includes(i.categoryId));
+    let items = (menuItems || []).filter(i => tabCatIds.includes(i.categoryId));
     if (activeCategory !== 'all') items = items.filter(i => i.categoryId === activeCategory);
-    if (q) items = items.filter(i => i.name.toLowerCase().includes(q) || i.code?.toLowerCase().includes(q));
+    if (q) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
     return items;
   }, [menuItems, activeMenuTab, activeCategory, searchQuery, barCategories, kitchenCategories]);
 
-  const handleTableClick = async (table) => {
+  const handleTableClick = (table) => {
     if (!currentSession) { addToast('Start a session first!', 'warning'); return; }
     if (table.status === 'available') {
       setCustomerModal(table);
     } else {
-      setSearchParams({ tableId: table.id });
+      setSelectedTableId(table.id);
     }
+  };
+
+  const handleBack = () => {
+    setSelectedTableId(null);
+    setOrder(null);
+    setSearchQuery('');
+    setActiveCategory('all');
   };
 
   const handleStartOrder = async () => {
-    if (!customerModal) return;
+    if (!customerModal || busy) return;
+    setBusy(true);
     const table = customerModal;
     try {
-      const newOrder = await createOrder(table.id, table.label || `T${table.number}`, customerName);
-      refresh();
+      await createOrder(table.id, table.label || `T${table.number}`, customerName);
+      await refresh();
       addToast(`${table.label} — Order started`, 'success');
       setCustomerModal(null);
       setCustomerName('');
-      setSearchParams({ tableId: table.id });
-    } catch (e) { addToast('Failed: ' + e.message, 'error'); }
+      setSelectedTableId(table.id);
+    } catch (e) { addToast('Failed: ' + (e.message || 'Unknown error'), 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleAddItem = async (menuItem) => {
-    if (!order || itemAdding) return;
-    if (menuItem.stock <= 0) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
-    
-    setItemAdding(true);
-    // Optimistic UI update (optional but helps feel faster)
-    const tempItemId = 'temp-' + Date.now();
-    const optimisticItem = {
-      id: tempItemId,
-      orderId: order.id,
-      menuItemId: menuItem.id,
-      name: menuItem.name,
-      price: menuItem.price,
-      quantity: 1,
-      categoryType: categories.find(c => c.id === menuItem.categoryId)?.type || 'bar'
-    };
-    
-    setOrder(prev => ({
-      ...prev,
-      items: [...(prev?.items || []), optimisticItem]
-    }));
+    if (!order || busy) return;
+    if ((menuItem.stock ?? 0) <= 0) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
 
+    setBusy(true);
     try {
-      await addItemToOrder(order.id, { ...menuItem, categoryType: optimisticItem.categoryType });
-      await refreshOrder();
+      const cat = (categories || []).find(c => c.id === menuItem.categoryId);
+      await addItemToOrder(order.id, { ...menuItem, categoryType: cat?.type || 'bar' });
+      // Just reload order, don't do full app sync for speed
+      await loadOrder();
       addToast(`+ ${menuItem.name}`, 'success');
-    } catch (e) { 
-      addToast(e.message || 'Failed', 'error');
-      // Rollback on failure
-      loadOrder();
-    } finally {
-      setItemAdding(false);
-    }
+    } catch (e) {
+      addToast(e.message || 'Failed to add item', 'error');
+    } finally { setBusy(false); }
   };
 
   const handleQtyChange = async (itemId, delta) => {
-    if (!order) return;
-    const item = order.items.find(i => i.id === itemId);
-    if (item) {
-      const newQty = item.quantity + delta;
-      try {
-        if (newQty <= 0) await removeOrderItem(order.id, itemId);
-        else await updateOrderItem(order.id, itemId, { quantity: newQty });
-        await refreshOrder();
-      } catch (e) { addToast(e.message || 'Failed', 'error'); }
-    }
+    if (!order || busy) return;
+    const item = safeItems.find(i => i.id === itemId);
+    if (!item) return;
+    const newQty = item.quantity + delta;
+    setBusy(true);
+    try {
+      if (newQty <= 0) await removeOrderItem(order.id, itemId);
+      else await updateOrderItem(order.id, itemId, { quantity: newQty });
+      await loadOrder();
+    } catch (e) { addToast(e.message || 'Failed', 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleRemoveItem = async (itemId) => {
-    if (!order) return;
+    if (!order || busy) return;
+    setBusy(true);
     try {
       await removeOrderItem(order.id, itemId);
-      await refreshOrder();
+      await loadOrder();
     } catch (e) { addToast(e.message || 'Failed', 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleAddNote = async () => {
-    if (!order || !noteModal) return;
+    if (!order || !noteModal || busy) return;
+    setBusy(true);
     try {
       await updateOrderItem(order.id, noteModal.id, { note: noteText });
-      await refreshOrder();
+      await loadOrder();
       setNoteModal(null);
       setNoteText('');
     } catch (e) { addToast(e.message || 'Failed', 'error'); }
+    finally { setBusy(false); }
   };
 
   const handlePrintSplitKOT = () => {
-    if (!order || order.items.length === 0) { addToast('No items to print', 'warning'); return; }
-    const tableLabel = selectedTable?.label || selectedTable?.number;
-    const result = printSplitKOT(order, tableLabel, categories);
-    if (result.kitchenKOT && result.barKOT) addToast('✅ Kitchen KOT + Bar KOT printed', 'success');
-    else if (result.kitchenKOT) addToast('✅ Kitchen KOT printed', 'success');
-    else if (result.barKOT) addToast('✅ Bar KOT printed', 'success');
+    if (!order || safeItems.length === 0) { addToast('No items to print', 'warning'); return; }
+    try {
+      const tableLabel = selectedTable?.label || selectedTable?.number;
+      const result = printSplitKOT(order, tableLabel, categories);
+      if (result?.kitchenKOT && result?.barKOT) addToast('Kitchen KOT + Bar KOT printed', 'success');
+      else if (result?.kitchenKOT) addToast('Kitchen KOT printed', 'success');
+      else if (result?.barKOT) addToast('Bar KOT printed', 'success');
+      else addToast('KOT sent', 'success');
+    } catch (e) { addToast('Print failed: ' + (e.message || ''), 'error'); }
   };
 
   const handleGenerateBill = async () => {
-    if (!order || order.items.length === 0) return;
+    if (!order || safeItems.length === 0 || busy) return;
+    setBusy(true);
     try {
       const result = await generateBill(order.id, paymentMode, discount);
-      if (result.bill) {
-        printBillDirect({ ...result.bill, currency: config.currency });
-        refresh();
-        addToast('✅ Bill generated & printed', 'success');
+      if (result?.bill) {
+        try { printBillDirect({ ...result.bill, currency: config.currency }); } catch {}
+        await refresh();
+        addToast('Bill generated & printed', 'success');
         setBillModal(false);
-        setSearchParams({}); // Clear selection
+        setSelectedTableId(null);
+        setOrder(null);
       } else {
-        addToast('Failed', 'error');
+        addToast('Failed to generate bill', 'error');
       }
-    } catch (e) { addToast('Failed: ' + e.message, 'error'); }
+    } catch (e) { addToast('Failed: ' + (e.message || ''), 'error'); }
+    finally { setBusy(false); }
   };
 
-  const subtotal = (order?.items || []).reduce((s, i) => s + (i.price * i.quantity), 0) || 0;
+  const subtotal = safeItems.reduce((s, i) => s + ((i.price || 0) * (i.quantity || 0)), 0);
   const tax = (subtotal * (config.taxRate || 0)) / 100;
   const serviceCharge = (subtotal * (config.serviceChargeRate || 0)) / 100;
   const discountAmt = (subtotal * discount) / 100;
   const total = subtotal + tax + serviceCharge - discountAmt;
 
-  const barOrderItems = (order?.items || []).filter(i => i.categoryType !== 'kitchen');
-  const kitchenOrderItems = (order?.items || []).filter(i => i.categoryType === 'kitchen');
+  const barOrderItems = safeItems.filter(i => i.categoryType !== 'kitchen');
+  const kitchenOrderItems = safeItems.filter(i => i.categoryType === 'kitchen');
 
   // ===== TABLE VIEW =====
   if (!selectedTableId) {
@@ -209,28 +204,28 @@ export default function StaffMobileDashboard() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="staff-sync-btn" onClick={refresh} title="Manual Refresh">
-              <Plus size={16} className={refreshing ? 'spin' : ''} />
+            <button className="staff-sync-btn" onClick={refresh} disabled={refreshing} title="Refresh">
+              <RefreshCw size={16} className={refreshing ? 'spin' : ''} />
             </button>
             <button className="staff-logout-btn" onClick={logout}><LogOut size={16} /></button>
           </div>
         </div>
 
         {refreshing && tables.length === 0 ? (
-          <div className="staff-loading">
+          <div className="resto-loader">
             <div className="resto-logo-spin">RG</div>
-            <p>Syncing Cloud Data...</p>
+            <div className="resto-loader-text">Syncing...</div>
           </div>
         ) : (
           <div className="staff-tables-scroll">
-            {sections.length === 0 && (
-              <div className="staff-empty-state">
+            {(sections || []).length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-tertiary)' }}>
                 <p>No sections found</p>
-                <button className="btn btn-secondary" onClick={refresh}>Try Re-syncing</button>
+                <button className="btn btn-secondary" onClick={refresh} style={{ marginTop: '8px' }}>Try Re-syncing</button>
               </div>
             )}
-            {sections.map(section => {
-              const sectionTables = tables.filter(t => t.sectionId === section.id);
+            {(sections || []).map(section => {
+              const sectionTables = (tables || []).filter(t => t.sectionId === section.id);
               if (sectionTables.length === 0) return null;
               return (
                 <div key={section.id} className="staff-section">
@@ -240,10 +235,10 @@ export default function StaffMobileDashboard() {
                   </div>
                   <div className="staff-table-grid">
                     {sectionTables.map(table => (
-                      <div key={table.id} className={`staff-table-card ${table.status}`} onClick={() => handleTableClick(table)}>
+                      <div key={table.id} className={`staff-table-card ${table.status || 'available'}`} onClick={() => handleTableClick(table)}>
                         <div className="staff-table-label">{table.label}</div>
-                        <div className={`staff-table-status ${table.status}`}>
-                          {table.status === 'available' ? 'FREE' : table.status === 'occupied' ? 'BUSY' : table.status.toUpperCase()}
+                        <div className={`staff-table-status ${table.status || 'available'}`}>
+                          {table.status === 'available' ? 'FREE' : table.status === 'occupied' ? 'BUSY' : (table.status || 'FREE').toUpperCase()}
                         </div>
                         {table.customerName && <div className="staff-table-customer">{table.customerName}</div>}
                       </div>
@@ -254,6 +249,7 @@ export default function StaffMobileDashboard() {
             })}
           </div>
         )}
+
         {customerModal && (
           <div className="modal-backdrop" onClick={() => setCustomerModal(null)}>
             <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '360px' }}>
@@ -271,7 +267,9 @@ export default function StaffMobileDashboard() {
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setCustomerModal(null)}>Cancel</button>
-                <button className="btn btn-success btn-lg" onClick={handleStartOrder}>START ORDER</button>
+                <button className="btn btn-success btn-lg" onClick={handleStartOrder} disabled={busy}>
+                  {busy ? 'STARTING...' : 'START ORDER'}
+                </button>
               </div>
             </div>
           </div>
@@ -286,38 +284,40 @@ export default function StaffMobileDashboard() {
   return (
     <div className="staff-mobile">
       <div className="staff-order-header">
-        <button className="staff-back-btn" onClick={() => { setSearchParams({}); setSearchQuery(''); setActiveCategory('all'); }}>
+        <button className="staff-back-btn" onClick={handleBack}>
           <ArrowLeft size={18} />
         </button>
         <div className="staff-order-table-info">
-          <div className="staff-order-table-name">{selectedTable?.label}</div>
+          <div className="staff-order-table-name">{selectedTable?.label || 'Table'}</div>
           {selectedTable?.customerName && <div className="staff-order-customer">{selectedTable.customerName}</div>}
         </div>
-        <button className="staff-kot-btn" onClick={handlePrintSplitKOT} disabled={!order || (order?.items || []).length === 0}>
+        <button className="staff-kot-btn" onClick={handlePrintSplitKOT} disabled={safeItems.length === 0}>
           <Printer size={14} /> KOT
         </button>
-        <button className="staff-bill-btn" onClick={() => setBillModal(true)} disabled={!order || (order?.items || []).length === 0}>
+        <button className="staff-bill-btn" onClick={() => setBillModal(true)} disabled={safeItems.length === 0}>
           <Receipt size={14} /> BILL
         </button>
       </div>
 
-      {order && (order?.items || []).length > 0 && (
+      {safeItems.length > 0 && (
         <div className="staff-order-items">
           <div className="staff-order-items-header">
-            <span>ORDER ({(order?.items || []).length})</span>
+            <span>ORDER ({safeItems.length})</span>
             <span className="staff-order-total">{config.currency}{subtotal}</span>
           </div>
           <div className="staff-order-items-list">
             {barOrderItems.length > 0 && (
               <>
                 <div className="staff-order-section-label bar"><Wine size={12} /> BAR ({barOrderItems.length})</div>
-                {barOrderItems.map(item => renderOrderItem(item))}
+                {barOrderItems.map(item => <OrderItemRow key={item.id} item={item} config={config} busy={busy}
+                  onQty={handleQtyChange} onRemove={handleRemoveItem} onNote={(it) => { setNoteModal(it); setNoteText(it.note || ''); }} />)}
               </>
             )}
             {kitchenOrderItems.length > 0 && (
               <>
                 <div className="staff-order-section-label kitchen"><Coffee size={12} /> KITCHEN ({kitchenOrderItems.length})</div>
-                {kitchenOrderItems.map(item => renderOrderItem(item))}
+                {kitchenOrderItems.map(item => <OrderItemRow key={item.id} item={item} config={config} busy={busy}
+                  onQty={handleQtyChange} onRemove={handleRemoveItem} onNote={(it) => { setNoteModal(it); setNoteText(it.note || ''); }} />)}
               </>
             )}
           </div>
@@ -352,12 +352,13 @@ export default function StaffMobileDashboard() {
 
       <div className="staff-menu-grid">
         {filteredItems.map(item => {
-          const isOOS = item.stock <= 0;
+          const isOOS = (item.stock ?? 0) <= 0;
           return (
-            <div 
-              key={item.id} 
-              className={`staff-menu-card ${isOOS ? 'oos' : ''} ${itemAdding ? 'processing' : ''}`}
-              onClick={() => !isOOS && !itemAdding && handleAddItem(item)}
+            <div
+              key={item.id}
+              className={`staff-menu-card ${isOOS ? 'oos' : ''}`}
+              onClick={() => !isOOS && handleAddItem(item)}
+              style={busy && !isOOS ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
             >
               <div className="staff-menu-card-name">{item.name}</div>
               <div className="staff-menu-card-bottom">
@@ -388,25 +389,25 @@ export default function StaffMobileDashboard() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setNoteModal(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleAddNote}>Save</button>
+              <button className="btn btn-primary" onClick={handleAddNote} disabled={busy}>Save</button>
             </div>
           </div>
         </div>
       )}
 
-      {billModal && selectedTable && (
+      {billModal && (
         <div className="modal-backdrop" onClick={() => setBillModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '380px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">BILL — {selectedTable.label}</h3>
+              <h3 className="modal-title">BILL — {selectedTable?.label || 'Table'}</h3>
               <button className="btn btn-ghost btn-icon" onClick={() => setBillModal(false)}>✕</button>
             </div>
             <div className="modal-body">
               <div style={{ marginBottom: '12px', maxHeight: '200px', overflow: 'auto', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '8px' }}>
-                {(order?.items || []).map(item => (
+                {safeItems.map(item => (
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '11px' }}>
                     <span>{item.name} ×{item.quantity}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{config.currency}{item.price * item.quantity}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{config.currency}{(item.price || 0) * (item.quantity || 0)}</span>
                   </div>
                 ))}
               </div>
@@ -420,7 +421,7 @@ export default function StaffMobileDashboard() {
               <div className="input-group">
                 <label className="input-label">Discount (%)</label>
                 <input type="number" className="input" value={discount}
-                  onChange={e => setDiscount(Math.max(0, Math.min(100, Number(e.target.value))))} min="0" max="100" />
+                  onChange={e => setDiscount(Math.max(0, Math.min(100, Number(e.target.value) || 0)))} min="0" max="100" />
               </div>
               <div style={{ borderTop: '2px solid var(--border-color)', paddingTop: '8px', marginTop: '8px' }}>
                 <div className="order-summary-row"><span>Subtotal</span><span>{config.currency}{subtotal}</span></div>
@@ -431,8 +432,8 @@ export default function StaffMobileDashboard() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setBillModal(false)}>Cancel</button>
-              <button className="btn btn-success btn-lg" onClick={handleGenerateBill}>
-                <Receipt size={14} /> GENERATE & PRINT
+              <button className="btn btn-success btn-lg" onClick={handleGenerateBill} disabled={busy}>
+                <Receipt size={14} /> {busy ? 'GENERATING...' : 'GENERATE & PRINT'}
               </button>
             </div>
           </div>
@@ -440,29 +441,30 @@ export default function StaffMobileDashboard() {
       )}
     </div>
   );
+}
 
-  function renderOrderItem(item) {
-    return (
-      <div key={item.id} className="staff-order-item">
-        <div className="staff-order-item-left">
-          <div className="staff-order-item-details">
-            <div className="staff-order-item-name">{item.name}</div>
-            {item.note && <div className="staff-order-item-note">→ {item.note}</div>}
-          </div>
-        </div>
-        <div className="staff-order-item-right">
-          <div className="staff-qty-controls">
-            <button className="staff-qty-btn" onClick={() => handleQtyChange(item.id, -1)}><Minus size={12} /></button>
-            <span className="staff-qty-val">{item.quantity}</span>
-            <button className="staff-qty-btn" onClick={() => handleQtyChange(item.id, 1)}><Plus size={12} /></button>
-          </div>
-          <div className="staff-order-item-price">{config.currency}{item.price * item.quantity}</div>
-          <div className="staff-order-item-actions">
-            <button className="staff-action-btn" onClick={() => { setNoteModal(item); setNoteText(item.note || ''); }}><StickyNote size={12} /></button>
-            <button className="staff-action-btn danger" onClick={() => handleRemoveItem(item.id)}><Trash2 size={12} /></button>
-          </div>
+// Extracted to prevent re-render issues
+function OrderItemRow({ item, config, busy, onQty, onRemove, onNote }) {
+  return (
+    <div className="staff-order-item">
+      <div className="staff-order-item-left">
+        <div className="staff-order-item-details">
+          <div className="staff-order-item-name">{item.name}</div>
+          {item.note && <div className="staff-order-item-note">→ {item.note}</div>}
         </div>
       </div>
-    );
-  }
+      <div className="staff-order-item-right">
+        <div className="staff-qty-controls">
+          <button className="staff-qty-btn" onClick={() => onQty(item.id, -1)} disabled={busy}><Minus size={12} /></button>
+          <span className="staff-qty-val">{item.quantity}</span>
+          <button className="staff-qty-btn" onClick={() => onQty(item.id, 1)} disabled={busy}><Plus size={12} /></button>
+        </div>
+        <div className="staff-order-item-price">{config.currency}{(item.price || 0) * (item.quantity || 0)}</div>
+        <div className="staff-order-item-actions">
+          <button className="staff-action-btn" onClick={() => onNote(item)}><StickyNote size={12} /></button>
+          <button className="staff-action-btn danger" onClick={() => onRemove(item.id)} disabled={busy}><Trash2 size={12} /></button>
+        </div>
+      </div>
+    </div>
+  );
 }

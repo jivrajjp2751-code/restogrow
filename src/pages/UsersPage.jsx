@@ -4,7 +4,7 @@ import { addUser, updateUser, deleteUser } from '../store/data';
 import { Plus, Edit3, Trash2, Shield, User } from 'lucide-react';
 
 export default function UsersPage() {
-  const { users, refresh, currentUser } = useApp();
+  const { users = [], refresh, currentUser } = useApp();
   const { addToast } = useToast();
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'staff' });

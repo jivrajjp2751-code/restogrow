@@ -4,7 +4,7 @@ import { updateConfig, injectFakeData } from '../store/data';
 import { Settings, Store, Receipt, RefreshCw } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { config, refresh } = useApp();
+  const { config = {}, refresh } = useApp();
   const { addToast } = useToast();
   const [form, setForm] = useState({ ...config });
 

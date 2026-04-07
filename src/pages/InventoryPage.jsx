@@ -4,7 +4,7 @@ import { addStock, addMenuItem, addCategory, updateCategory, deleteCategory, get
 import { Package, AlertTriangle, Plus, Search, PlusCircle, Wine, Coffee, Edit3, Trash2 } from 'lucide-react';
 
 export default function InventoryPage() {
-  const { menuItems, inventory_log, categories, config, refresh, currentUser, refreshing = false } = useApp();
+  const { menuItems = [], inventory_log = [], categories = [], config = {}, refresh, currentUser, refreshing = false } = useApp();
   const { addToast } = useToast();
   const isAdmin = currentUser?.role === 'admin';
 

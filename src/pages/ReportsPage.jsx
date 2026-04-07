@@ -4,7 +4,7 @@ import { getBills, getCategories, getSplitReport, getMonthBills, getMostSoldLiqu
 import { TrendingUp, Calendar, DollarSign, PieChart, Printer, Wine, Coffee, Award } from 'lucide-react';
 
 export default function ReportsPage() {
-  const { config, categories, bills, sessions, refreshing = false } = useApp();
+  const { config = {}, categories = [], bills = [], sessions = [], refreshing = false } = useApp();
   const [reportType, setReportType] = useState('daily'); // daily, monthly, session
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selectedSessionId, setSelectedSessionId] = useState('');

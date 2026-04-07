@@ -1,9 +1,9 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
 import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
-  updateTable, createOrder, generateBill,
+  createOrder, generateBill,
 } from '../store/data';
 import { printSplitKOT, printKitchenKOT, printBarKOT, printBillDirect } from '../utils/print';
 import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, Wine, Coffee, CreditCard, Banknote, Smartphone, Receipt } from 'lucide-react';
@@ -11,11 +11,11 @@ import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, Wine, Coff
 export default function OrderPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
-  const { tables, menuItems, categories, config, refresh, currentUser, refreshing = false } = useApp();
+  const { tables = [], menuItems = [], categories = [], config = {}, refresh, currentUser } = useApp();
   const { addToast } = useToast();
   const isAdmin = currentUser?.role === 'admin';
 
-  const table = tables.find(t => t.id === tableId);
+  const table = useMemo(() => (tables || []).find(t => t.id === tableId), [tables, tableId]);
   const [order, setOrder] = useState(null);
   const [barCategory, setBarCategory] = useState('all');
   const [kitchenCategory, setKitchenCategory] = useState('all');
@@ -26,155 +26,167 @@ export default function OrderPage() {
   const [directBillModal, setDirectBillModal] = useState(false);
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [discount, setDiscount] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [orderLoading, setOrderLoading] = useState(true);
 
-  useEffect(() => {
-    if (table) {
-      const loadOrder = async () => {
-        let existingOrder = await getOrderForTable(tableId);
-        if (!existingOrder && table.status === 'available') {
-          await createOrder(tableId, table.label || `T${table.number}`);
-          existingOrder = await getOrderForTable(tableId);
-          refresh();
-        }
-        setOrder(existingOrder);
-      };
-      loadOrder();
+  // Load order on mount
+  const loadOrder = useCallback(async () => {
+    if (!tableId) return;
+    try {
+      let existingOrder = await getOrderForTable(tableId);
+      if (!existingOrder && table?.status === 'available') {
+        await createOrder(tableId, table.label || `T${table.number}`);
+        existingOrder = await getOrderForTable(tableId);
+        refresh();
+      }
+      setOrder(existingOrder);
+    } catch (e) {
+      console.error('Load order error:', e);
+      setOrder(null);
+    } finally {
+      setOrderLoading(false);
     }
   }, [tableId, table]);
 
-  const refreshOrder = async () => {
-    const updated = await getOrderForTable(tableId);
-    setOrder(updated);
-    refresh();
-  };
+  useEffect(() => { loadOrder(); }, [loadOrder]);
+
+  const safeItems = order?.items || [];
 
   // Classify categories
-  const barCategories = categories.filter(c => c.type === 'bar');
-  const kitchenCategories = categories.filter(c => c.type === 'kitchen');
-  const barCatIds = barCategories.map(c => c.id);
-  const kitchenCatIds = kitchenCategories.map(c => c.id);
+  const barCategories = useMemo(() => (categories || []).filter(c => c.type === 'bar'), [categories]);
+  const kitchenCategories = useMemo(() => (categories || []).filter(c => c.type === 'kitchen'), [categories]);
+  const barCatIds = useMemo(() => barCategories.map(c => c.id), [barCategories]);
+  const kitchenCatIds = useMemo(() => kitchenCategories.map(c => c.id), [kitchenCategories]);
 
   // Filter items
   const isSearching = searchQuery.length > 0;
   const q = searchQuery.toLowerCase();
 
   const barItems = useMemo(() => {
-    let items = menuItems.filter(i => barCatIds.includes(i.categoryId));
+    let items = (menuItems || []).filter(i => barCatIds.includes(i.categoryId));
     if (barCategory !== 'all') items = items.filter(i => i.categoryId === barCategory);
-    if (isSearching) items = items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q));
+    if (isSearching) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
     return items;
   }, [menuItems, barCategory, searchQuery, barCatIds]);
 
   const kitchenItems = useMemo(() => {
-    let items = menuItems.filter(i => kitchenCatIds.includes(i.categoryId));
+    let items = (menuItems || []).filter(i => kitchenCatIds.includes(i.categoryId));
     if (kitchenCategory !== 'all') items = items.filter(i => i.categoryId === kitchenCategory);
-    if (isSearching) items = items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q));
+    if (isSearching) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
     return items;
   }, [menuItems, kitchenCategory, searchQuery, kitchenCatIds]);
 
   const handleAddItem = async (menuItem) => {
-    if (!order) return;
-    if (menuItem.stock <= 0) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
+    if (!order || busy) return;
+    if ((menuItem.stock ?? 0) <= 0) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
+    setBusy(true);
     try {
-      const cat = categories.find(c => c.id === menuItem.categoryId);
+      const cat = (categories || []).find(c => c.id === menuItem.categoryId);
       await addItemToOrder(order.id, { ...menuItem, categoryType: cat?.type || 'bar' });
-      await refreshOrder();
+      await loadOrder();
       addToast(`+ ${menuItem.name}`, 'success');
-    } catch (e) { addToast(e.message || 'Failed', 'error'); console.error('Add Item Error:', e); }
+    } catch (e) { addToast(e.message || 'Failed', 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleQtyChange = async (itemId, delta) => {
-    if (!order) return;
-    const item = order.items.find(i => i.id === itemId);
-    if (item) {
-      const newQty = item.quantity + delta;
-      try {
-        if (newQty <= 0) await removeOrderItem(order.id, itemId);
-        else await updateOrderItem(order.id, itemId, { quantity: newQty });
-        await refreshOrder();
-      } catch (e) { addToast('Failed', 'error'); }
-    }
+    if (!order || busy) return;
+    const item = safeItems.find(i => i.id === itemId);
+    if (!item) return;
+    const newQty = item.quantity + delta;
+    setBusy(true);
+    try {
+      if (newQty <= 0) await removeOrderItem(order.id, itemId);
+      else await updateOrderItem(order.id, itemId, { quantity: newQty });
+      await loadOrder();
+    } catch (e) { addToast('Failed', 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleRemoveItem = async (itemId) => {
-    if (!order) return;
-    try { await removeOrderItem(order.id, itemId); await refreshOrder(); }
+    if (!order || busy) return;
+    setBusy(true);
+    try { await removeOrderItem(order.id, itemId); await loadOrder(); }
     catch (e) { addToast('Failed', 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleAddNote = async () => {
-    if (!order || !noteModal) return;
-    try { await updateOrderItem(order.id, noteModal.id, { note: noteText }); await refreshOrder(); }
+    if (!order || !noteModal || busy) return;
+    setBusy(true);
+    try { await updateOrderItem(order.id, noteModal.id, { note: noteText }); await loadOrder(); }
     catch (e) { addToast('Failed', 'error'); }
+    finally { setBusy(false); }
     setNoteModal(null);
     setNoteText('');
   };
 
   const handleGoToBilling = async () => {
-    if (!order || order.items.length === 0) { addToast('Add items first', 'warning'); return; }
-    try {
-      await updateTable(tableId, { status: 'billing' });
-      refresh();
-      navigate(`/billing/${order.id}`);
-    } catch (e) { addToast('Failed: ' + e.message, 'error'); }
+    if (!order || safeItems.length === 0) { addToast('Add items first', 'warning'); return; }
+    navigate(`/billing/${order.id}`);
   };
 
-  // ===== KOT PRINT OPTIONS (Admin/Counter) =====
+  // KOT print
   const handlePrintSplitKOT = () => {
-    if (!order || order.items.length === 0) { addToast('No items', 'warning'); return; }
-    const tableLabel = table?.label || table?.number;
-    const result = printSplitKOT(order, tableLabel, categories);
-    if (result.kitchenKOT && result.barKOT) addToast('Kitchen KOT + Bar KOT printed', 'success');
-    else if (result.kitchenKOT) addToast('Kitchen KOT printed', 'success');
-    else if (result.barKOT) addToast('Bar KOT printed', 'success');
+    if (!order || safeItems.length === 0) { addToast('No items', 'warning'); return; }
+    try {
+      const tableLabel = table?.label || table?.number;
+      const result = printSplitKOT(order, tableLabel, categories);
+      if (result?.kitchenKOT && result?.barKOT) addToast('Kitchen KOT + Bar KOT printed', 'success');
+      else if (result?.kitchenKOT) addToast('Kitchen KOT printed', 'success');
+      else if (result?.barKOT) addToast('Bar KOT printed', 'success');
+      else addToast('KOT sent', 'success');
+    } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
   };
 
   const handlePrintKitchenOnly = () => {
     if (!order) return;
-    const tableLabel = table?.label || table?.number;
-    const success = printKitchenKOT(order, tableLabel, categories);
-    if (success) addToast('Kitchen KOT printed', 'success');
-    else addToast('No kitchen items', 'warning');
+    try {
+      const tableLabel = table?.label || table?.number;
+      const success = printKitchenKOT(order, tableLabel, categories);
+      addToast(success ? 'Kitchen KOT printed' : 'No kitchen items', success ? 'success' : 'warning');
+    } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
   };
 
   const handlePrintBarOnly = () => {
     if (!order) return;
-    const tableLabel = table?.label || table?.number;
-    const success = printBarKOT(order, tableLabel, categories);
-    if (success) addToast('Bar KOT printed', 'success');
-    else addToast('No bar items', 'warning');
+    try {
+      const tableLabel = table?.label || table?.number;
+      const success = printBarKOT(order, tableLabel, categories);
+      addToast(success ? 'Bar KOT printed' : 'No bar items', success ? 'success' : 'warning');
+    } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
   };
 
-  // ===== DIRECT BILL (no KOT — for counter items) =====
+  // Direct bill
   const handleDirectBill = async () => {
-    if (!order || order.items.length === 0) { addToast('Add items first', 'warning'); return; }
+    if (!order || safeItems.length === 0 || busy) return;
+    setBusy(true);
     try {
       const result = await generateBill(order.id, paymentMode, discount);
-      if (result.bill) {
-        printBillDirect({...result.bill, currency: config.currency});
-        refresh();
-        addToast('✅ Direct bill generated & printed', 'success');
+      if (result?.bill) {
+        try { printBillDirect({ ...result.bill, currency: config.currency }); } catch {}
+        await refresh();
+        addToast('Direct bill generated & printed', 'success');
         setDirectBillModal(false);
         navigate('/tables');
       } else {
         addToast('Failed to generate bill', 'error');
       }
-    } catch (e) { addToast('Failed: ' + e.message, 'error'); }
+    } catch (e) { addToast('Failed: ' + (e.message || ''), 'error'); }
+    finally { setBusy(false); }
   };
 
-  const subtotal = (order?.items || []).reduce((s, i) => s + (i.price * i.quantity), 0) || 0;
+  const subtotal = safeItems.reduce((s, i) => s + ((i.price || 0) * (i.quantity || 0)), 0);
   const tax = (subtotal * (config.taxRate || 0)) / 100;
   const serviceCharge = (subtotal * (config.serviceChargeRate || 0)) / 100;
   const total = subtotal + tax + serviceCharge;
+  const kitchenCount = safeItems.filter(i => i.categoryType === 'kitchen').length;
+  const barCount = safeItems.filter(i => i.categoryType !== 'kitchen').length;
 
-  // Count items by type
-  const kitchenCount = (order?.items || []).filter(i => i.categoryType === 'kitchen').length;
-  const barCount = (order?.items || []).filter(i => i.categoryType !== 'kitchen').length;
-
-  if (!table) {
+  if (!table && !orderLoading) {
     return (
       <div className="page-content">
         <div className="empty-state">
@@ -185,47 +197,58 @@ export default function OrderPage() {
     );
   }
 
-  // Render a menu item card
-  const renderItemCard = (item) => (
-    <div
-      key={item.id}
-      className="menu-item-card"
-      onClick={() => handleAddItem(item)}
-      style={{ opacity: item.stock <= 0 ? 0.3 : 1, pointerEvents: item.stock <= 0 ? 'none' : 'auto' }}
-    >
-      <div className="menu-item-name">{item.name}</div>
-      <div className="menu-item-code">{item.code}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '4px' }}>
-        <div className="menu-item-price">{config.currency}{item.price}</div>
-        {item.stock <= 5 && item.stock > 0 && (
-          <span style={{ fontSize: '9px', color: 'var(--brand-danger)', fontFamily: 'var(--font-mono)' }}>LOW:{item.stock}</span>
-        )}
-        {item.stock <= 0 && <span className="badge badge-danger">OUT</span>}
+  if (orderLoading) {
+    return (
+      <div className="page-content">
+        <div className="resto-loader">
+          <div className="resto-logo-spin">RG</div>
+          <div className="resto-loader-text">Loading order...</div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  const renderItemCard = (item) => {
+    const isOOS = (item.stock ?? 0) <= 0;
+    return (
+      <div
+        key={item.id}
+        className="menu-item-card"
+        onClick={() => !isOOS && handleAddItem(item)}
+        style={{
+          opacity: isOOS ? 0.25 : busy ? 0.6 : 1,
+          pointerEvents: isOOS || busy ? 'none' : 'auto',
+          filter: isOOS ? 'grayscale(1)' : undefined,
+        }}
+      >
+        <div className="menu-item-name">{item.name}</div>
+        {item.code && <div className="menu-item-code">{item.code}</div>}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '4px' }}>
+          <div className="menu-item-price">{config.currency}{item.price}</div>
+          {(item.stock ?? 0) <= 5 && (item.stock ?? 0) > 0 && (
+            <span style={{ fontSize: '9px', color: 'var(--brand-danger)', fontFamily: 'var(--font-mono)' }}>LOW:{item.stock}</span>
+          )}
+          {isOOS && <span className="badge badge-danger">OUT</span>}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="order-layout">
-      {/* Left: Menu — split into bar and kitchen horizontally */}
+      {/* Left: Menu */}
       <div className="menu-panel">
-        {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button className="btn btn-ghost btn-icon" onClick={() => navigate('/tables')} title="Back">
             <ArrowLeft size={16} />
           </button>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
-              {table.label || `T${table.number}`} {table.customerName && `— ${table.customerName}`}
+              {table?.label || `T${table?.number}`} {table?.customerName && `— ${table.customerName}`}
             </div>
           </div>
-          {/* KOT dropdown for admin/counter */}
           <div style={{ position: 'relative' }}>
-            <button
-              className="btn btn-sm btn-secondary"
-              onClick={() => setShowKOTMenu(!showKOTMenu)}
-              title="Print KOT"
-            >
+            <button className="btn btn-sm btn-secondary" onClick={() => setShowKOTMenu(!showKOTMenu)} title="Print KOT">
               <Printer size={12} /> KOT ▾
             </button>
             {showKOTMenu && (
@@ -247,13 +270,9 @@ export default function OrderPage() {
           </div>
         </div>
 
-        {/* Search — searches across both */}
         <div className="search-input-wrapper">
           <Search />
-          <input
-            className="input"
-            placeholder="Search all items..."
-            value={searchQuery}
+          <input className="input" placeholder="Search all items..." value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter') {
@@ -265,15 +284,9 @@ export default function OrderPage() {
           />
         </div>
 
-        {/* Two-column split: BAR | KITCHEN */}
         <div className="menu-split-container">
-          {/* BAR SECTION */}
           <div className="menu-split-section bar">
-            <div className="menu-split-header bar">
-              <Wine size={14} />
-              <span>BAR</span>
-              <span style={{ fontSize: '9px', opacity: 0.6 }}>{barItems.length}</span>
-            </div>
+            <div className="menu-split-header bar"><Wine size={14} /><span>BAR</span><span style={{ fontSize: '9px', opacity: 0.6 }}>{barItems.length}</span></div>
             {!isSearching && (
               <div className="category-tabs compact">
                 <button className={`category-tab ${barCategory === 'all' ? 'active' : ''}`} onClick={() => setBarCategory('all')}>ALL</button>
@@ -286,21 +299,12 @@ export default function OrderPage() {
             )}
             <div className="menu-items-grid compact">
               {barItems.map(renderItemCard)}
-              {barItems.length === 0 && (
-                <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}>
-                  <p className="empty-state-text" style={{ fontSize: '10px' }}>No bar items</p>
-                </div>
-              )}
+              {barItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No bar items</p></div>}
             </div>
           </div>
 
-          {/* KITCHEN SECTION */}
           <div className="menu-split-section kitchen">
-            <div className="menu-split-header kitchen">
-              <Coffee size={14} />
-              <span>KITCHEN</span>
-              <span style={{ fontSize: '9px', opacity: 0.6 }}>{kitchenItems.length}</span>
-            </div>
+            <div className="menu-split-header kitchen"><Coffee size={14} /><span>KITCHEN</span><span style={{ fontSize: '9px', opacity: 0.6 }}>{kitchenItems.length}</span></div>
             {!isSearching && (
               <div className="category-tabs compact">
                 <button className={`category-tab ${kitchenCategory === 'all' ? 'active' : ''}`} onClick={() => setKitchenCategory('all')}>ALL</button>
@@ -313,11 +317,7 @@ export default function OrderPage() {
             )}
             <div className="menu-items-grid compact">
               {kitchenItems.map(renderItemCard)}
-              {kitchenItems.length === 0 && (
-                <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}>
-                  <p className="empty-state-text" style={{ fontSize: '10px' }}>No kitchen items</p>
-                </div>
-              )}
+              {kitchenItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No kitchen items</p></div>}
             </div>
           </div>
         </div>
@@ -327,12 +327,12 @@ export default function OrderPage() {
       <div className="order-panel">
         <div className="order-panel-header">
           <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '12px' }}>ORDER</span>
-          <span className="badge badge-info">{(order?.items || []).length} items</span>
+          <span className="badge badge-info">{safeItems.length} items</span>
         </div>
 
         <div className="order-items-list">
-          {(order?.items || []).length > 0 ? (
-            order.items.map(item => (
+          {safeItems.length > 0 ? (
+            safeItems.map(item => (
               <div key={item.id} className="order-item">
                 <div className="order-item-info">
                   <div className="order-item-name">
@@ -349,16 +349,16 @@ export default function OrderPage() {
                   {item.note && <div className="order-item-note">→ {item.note}</div>}
                 </div>
                 <div className="qty-controls">
-                  <button className="qty-btn" onClick={() => handleQtyChange(item.id, -1)}><Minus size={10} /></button>
+                  <button className="qty-btn" onClick={() => handleQtyChange(item.id, -1)} disabled={busy}><Minus size={10} /></button>
                   <span className="qty-value">{item.quantity}</span>
-                  <button className="qty-btn" onClick={() => handleQtyChange(item.id, 1)}><Plus size={10} /></button>
+                  <button className="qty-btn" onClick={() => handleQtyChange(item.id, 1)} disabled={busy}><Plus size={10} /></button>
                 </div>
-                <div className="order-item-price">{config.currency}{(item.price * item.quantity)}</div>
+                <div className="order-item-price">{config.currency}{(item.price || 0) * (item.quantity || 0)}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => { setNoteModal(item); setNoteText(item.note || ''); }}>
                     <StickyNote size={10} />
                   </button>
-                  <button className="btn btn-ghost btn-sm" style={{ color: 'var(--brand-danger)' }} onClick={() => handleRemoveItem(item.id)}>
+                  <button className="btn btn-ghost btn-sm" style={{ color: 'var(--brand-danger)' }} onClick={() => handleRemoveItem(item.id)} disabled={busy}>
                     <Trash2 size={10} />
                   </button>
                 </div>
@@ -372,38 +372,22 @@ export default function OrderPage() {
           )}
         </div>
 
-        {(order?.items || []).length > 0 && (
+        {safeItems.length > 0 && (
           <>
             <div className="order-summary">
-              <div className="order-summary-row">
-                <span>Subtotal</span><span>{config.currency}{subtotal}</span>
-              </div>
-              {config.taxRate > 0 && (
-                <div className="order-summary-row">
-                  <span>Tax {config.taxRate}%</span><span>{config.currency}{Math.round(tax)}</span>
-                </div>
-              )}
-              {config.serviceChargeRate > 0 && (
-                <div className="order-summary-row">
-                  <span>Service {config.serviceChargeRate}%</span><span>{config.currency}{Math.round(serviceCharge)}</span>
-                </div>
-              )}
-              <div className="order-summary-row total">
-                <span>TOTAL</span><span>{config.currency}{Math.round(total)}</span>
-              </div>
+              <div className="order-summary-row"><span>Subtotal</span><span>{config.currency}{subtotal}</span></div>
+              {(config.taxRate || 0) > 0 && <div className="order-summary-row"><span>Tax {config.taxRate}%</span><span>{config.currency}{Math.round(tax)}</span></div>}
+              {(config.serviceChargeRate || 0) > 0 && <div className="order-summary-row"><span>Service {config.serviceChargeRate}%</span><span>{config.currency}{Math.round(serviceCharge)}</span></div>}
+              <div className="order-summary-row total"><span>TOTAL</span><span>{config.currency}{Math.round(total)}</span></div>
             </div>
             <div className="order-actions" style={{ gridTemplateColumns: isAdmin ? '1fr 1fr 1fr' : '1fr 1fr' }}>
-              <button className="btn btn-secondary btn-lg" onClick={handlePrintSplitKOT}>
-                <Printer size={14} /> KOT
-              </button>
+              <button className="btn btn-secondary btn-lg" onClick={handlePrintSplitKOT}><Printer size={14} /> KOT</button>
               {isAdmin && (
-                <button className="btn btn-warning btn-lg" onClick={() => setDirectBillModal(true)} title="Direct bill without KOT — for counter items">
+                <button className="btn btn-warning btn-lg" onClick={() => setDirectBillModal(true)} title="Direct bill without KOT">
                   <Receipt size={14} /> DIRECT
                 </button>
               )}
-              <button className="btn btn-success btn-lg" onClick={handleGoToBilling}>
-                BILL
-              </button>
+              <button className="btn btn-success btn-lg" onClick={handleGoToBilling}>BILL</button>
             </div>
           </>
         )}
@@ -418,32 +402,25 @@ export default function OrderPage() {
               <button className="btn btn-ghost btn-icon" onClick={() => setNoteModal(null)}>✕</button>
             </div>
             <div className="modal-body">
-              <textarea
-                className="input"
-                placeholder="e.g., No ice, extra lime..."
-                value={noteText}
-                onChange={e => setNoteText(e.target.value)}
-                rows={2}
-                autoFocus
+              <textarea className="input" placeholder="e.g., No ice, extra lime..." value={noteText}
+                onChange={e => setNoteText(e.target.value)} rows={2} autoFocus
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddNote(); } }}
               />
               <div style={{ display: 'flex', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
                 {['No ice', 'Extra lime', 'On the rocks', 'Neat', 'With soda', 'Double'].map(q => (
-                  <button key={q} className="btn btn-sm btn-secondary" onClick={() => setNoteText(prev => prev ? `${prev}, ${q}` : q)}>
-                    {q}
-                  </button>
+                  <button key={q} className="btn btn-sm btn-secondary" onClick={() => setNoteText(prev => prev ? `${prev}, ${q}` : q)}>{q}</button>
                 ))}
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setNoteModal(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleAddNote}>Save</button>
+              <button className="btn btn-primary" onClick={handleAddNote} disabled={busy}>Save</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Direct Bill Modal (no KOT — paper saving) */}
+      {/* Direct Bill Modal */}
       {directBillModal && (
         <div className="modal-backdrop" onClick={() => setDirectBillModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -455,39 +432,26 @@ export default function OrderPage() {
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                 Generate bill directly without printing KOT. Ideal for counter items and takeaway.
               </p>
-
-              {/* Items preview */}
               <div style={{ marginBottom: '12px', maxHeight: '150px', overflow: 'auto', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '8px' }}>
-                {(order?.items || []).map(item => (
+                {safeItems.map(item => (
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '11px' }}>
                     <span>{item.name} ×{item.quantity}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{config.currency}{item.price * item.quantity}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{config.currency}{(item.price || 0) * (item.quantity || 0)}</span>
                   </div>
                 ))}
               </div>
-
-              {/* Payment mode */}
               <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)', marginBottom: '8px', color: 'var(--text-secondary)' }}>PAYMENT</div>
               <div className="payment-modes" style={{ marginBottom: '12px' }}>
                 {[{ mode: 'Cash', icon: Banknote }, { mode: 'Card', icon: CreditCard }, { mode: 'UPI', icon: Smartphone }].map(p => (
-                  <button key={p.mode}
-                    className={`payment-mode-btn ${paymentMode === p.mode ? 'active' : ''}`}
-                    onClick={() => setPaymentMode(p.mode)}>
-                    <p.icon size={18} />
-                    <span>{p.mode}</span>
-                  </button>
+                  <button key={p.mode} className={`payment-mode-btn ${paymentMode === p.mode ? 'active' : ''}`}
+                    onClick={() => setPaymentMode(p.mode)}><p.icon size={18} /><span>{p.mode}</span></button>
                 ))}
               </div>
-
-              {/* Discount */}
               <div className="input-group">
                 <label className="input-label">Discount (%)</label>
                 <input type="number" className="input" value={discount}
-                  onChange={e => setDiscount(Math.max(0, Math.min(100, Number(e.target.value))))}
-                  min="0" max="100" />
+                  onChange={e => setDiscount(Math.max(0, Math.min(100, Number(e.target.value) || 0)))} min="0" max="100" />
               </div>
-
-              {/* Total */}
               <div className="order-summary-row total" style={{ marginTop: '8px' }}>
                 <span>TOTAL</span>
                 <span>{config.currency}{Math.round(total - (subtotal * discount / 100))}</span>
@@ -495,18 +459,15 @@ export default function OrderPage() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setDirectBillModal(false)}>Cancel</button>
-              <button className="btn btn-success btn-lg" onClick={handleDirectBill}>
-                <Receipt size={14} /> GENERATE & PRINT
+              <button className="btn btn-success btn-lg" onClick={handleDirectBill} disabled={busy}>
+                <Receipt size={14} /> {busy ? 'GENERATING...' : 'GENERATE & PRINT'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Click outside KOT menu to close */}
-      {showKOTMenu && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowKOTMenu(false)} />
-      )}
+      {showKOTMenu && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowKOTMenu(false)} />}
     </div>
   );
 }
