@@ -168,13 +168,10 @@ export async function generateBill(orderId, paymentMode, discount) {
     id: billId,
     orderId: orderId,
     billNumber,
-    customerName: '', // Order table doesn't have it, so leaving empty for now
+    customerName: '', 
     total,
     paymentMode,
-    subtotal,
-    taxRate: cfg.taxRate,
-    taxAmount,
-    discountAmount
+    subtotal
   });
 
   const billItems = items.map(item => ({
