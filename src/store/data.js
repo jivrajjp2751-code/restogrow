@@ -256,8 +256,10 @@ export async function generateBill(orderId, paymentMode, discount) {
     restaurant_id: _restaurantId
   }));
   
-  const { error: biErr } = await supabase.from('bill_items').insert(billItems);
-  if (biErr) console.error('bill_items insert failed:', biErr.message);
+  if (billItems.length > 0) {
+    const { error: biErr } = await supabase.from('bill_items').insert(billItems);
+    if (biErr) throw new Error(`bill_items insert failed: ${biErr.message}`);
+  }
 
   await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
   await supabase.from('tables').update({ status: 'available' }).eq('id', order.tableId);
