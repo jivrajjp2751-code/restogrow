@@ -74,6 +74,25 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      <div className="config-section">
+        <h3 className="config-section-title">🛠️ DIAGNOSTICS</h3>
+        <button 
+          className="btn btn-secondary" 
+          onClick={async () => {
+             try {
+               const { supabase } = await import('../utils/supabase');
+               const { data: o } = await supabase.from('order_items').select('*').limit(1);
+               const { data: b } = await supabase.from('bill_items').select('*').limit(1);
+               const { data: inv } = await supabase.from('inventory_log').select('*').limit(1);
+               const msg = `order_items: ${o ? Object.keys(o[0] || {}) : 'none'}\n\nbill_items: ${b ? Object.keys(b[0] || {}) : 'none'}\n\ninventory: ${inv ? Object.keys(inv[0] || {}) : 'none'}`;
+               alert(msg);
+             } catch (e) { alert(e.message); }
+          }}
+        >
+          CHECK DATABASE SCHEMA
+        </button>
+      </div>
+
       <div className="config-section" style={{ borderColor: 'rgba(255,107,107,0.3)' }}>
         <h3 className="config-section-title" style={{ color: 'var(--brand-danger)' }}><RefreshCw size={14} /> DANGER ZONE</h3>
         <p style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '10px' }}>Reset clears ALL data — orders, bills, menu, inventory, sessions.</p>
