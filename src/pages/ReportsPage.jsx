@@ -55,9 +55,11 @@ export default function ReportsPage() {
   const categorySales = {};
   filteredBills.forEach(bill => {
     (bill.items || []).forEach(item => {
-      const cat = (categories || []).find(c => c.id === (item.categoryId || item.category_id));
-      const catName = cat ? cat.name : 'Other';
-      if (!categorySales[catName]) categorySales[catName] = { qty: 0, revenue: 0, color: cat?.color || '#999', type: cat?.type || 'bar' };
+      // bill_items only have categoryType, not categoryId
+      const catType = item.categoryType || 'bar';
+      const catName = catType === 'kitchen' ? 'Kitchen' : 'Bar';
+      const catColor = catType === 'kitchen' ? '#FDCB6E' : '#6C5CE7';
+      if (!categorySales[catName]) categorySales[catName] = { qty: 0, revenue: 0, color: catColor, type: catType };
       categorySales[catName].qty += (item.quantity || 0);
       categorySales[catName].revenue += (item.price || 0) * (item.quantity || 0);
     });
