@@ -8,6 +8,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    rollupOptions: {
+      external: ['tslib']
+    }
+  },
+  optimizeDeps: {
+    include: ['@supabase/supabase-js', 'tslib']
   },
   server: {
     host: '127.0.0.1',

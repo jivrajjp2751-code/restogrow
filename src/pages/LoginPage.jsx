@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { authenticateUser, useApp, useToast } from '../context/AppContext';
+import { useApp, useToast } from '../context/AppContext';
+import { authenticateUser } from '../store/data';
 import { Loader2, ShieldCheck, HelpCircle } from 'lucide-react';
 
 export default function LoginPage() {

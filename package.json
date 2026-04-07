@@ -8,8 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:react": "vite build",
-    "build": "npm run build:react && electron-builder",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -31,6 +30,7 @@
   "dependencies": {
     "@capacitor/android": "^8.3.0",
     "@capacitor/core": "^8.3.0",
+    "@supabase/supabase-js": "^2.101.1",
     "cors": "^2.8.6",
     "date-fns": "^4.1.0",
     "express": "^5.2.1",
@@ -43,6 +43,7 @@
     "recharts": "^3.8.1",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
+    "tslib": "^2.8.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

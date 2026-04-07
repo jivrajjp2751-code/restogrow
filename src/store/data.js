@@ -124,6 +124,51 @@ export async function generateBill(orderId, paymentMode, discount) {
   // Complex bill logic moved to CloudDB...
 }
 
+export async function getOrderForTable(tableId) {
+  if (!_restaurantId) return null;
+  const { data } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('restaurant_id', _restaurantId)
+    .eq('tableId', tableId)
+    .eq('status', 'active')
+    .single();
+  return data || null;
+}
+
+export async function updateOrderItem(orderId, itemId, data) {
+  return dbUpdate('order_items', itemId, data);
+}
+
+export async function removeOrderItem(orderId, itemId) {
+  return dbDelete('order_items', itemId);
+}
+
+export async function updateConfig(updates) {
+  for (const [id, value] of Object.entries(updates)) {
+    const val = typeof value === 'string' ? value : JSON.stringify(value);
+    await supabase.from('config').upsert({ id, value: val, restaurant_id: _restaurantId });
+  }
+}
+
+export async function addUser(data) { return dbInsert('users', data); }
+export async function updateUser(id, data) { return dbUpdate('users', id, data); }
+export async function deleteUser(id) { return dbDelete('users', id); }
+
+export async function addInventoryLog(data) {
+  return dbInsert('inventory_log', data);
+}
+
+export async function addStock(menuItemId, qty, reason) {
+  const { data: item } = await supabase.from('menu_items').select('*').eq('id', menuItemId).single();
+  const newStock = (item?.stock || 0) + parseInt(qty);
+  await dbUpdate('menu_items', menuItemId, { stock: newStock });
+  return dbInsert('inventory_log', {
+    menuItemId, itemName: item?.name, changeQty: qty,
+    newStock, type: 'add', reason: reason || 'Manual restock'
+  });
+}
+
 export async function startSession(startedBy) {
   return dbInsert('sessions', {
     date: new Date().toLocaleDateString(),
@@ -176,3 +221,33 @@ export function getSplitReport(bills, categories) {
 export function getSessionBills(sessionId, bills) {
   return (bills || []).filter(b => b.sessionId === sessionId);
 }
+
+// Client-side computed helpers (legacy support)
+export function getInventoryLog() { return []; }
+export function getLowStockItems() { return []; }
+export function getBills() { return []; }
+export function getCategories() { return []; }
+export function getSessions() { return []; }
+
+export function getMonthBills(month, bills) {
+  if (!bills) return [];
+  return bills.filter(b => b.createdAt?.startsWith(month));
+}
+
+export function getMostSoldLiquor(month, bills, categories) {
+  if (!bills || !categories) return [];
+  const monthBills = bills.filter(b => b.createdAt?.startsWith(month));
+  const itemMap = {};
+  monthBills.forEach(bill => {
+    (bill.items || []).forEach(item => {
+      if (item.categoryType === 'kitchen') return;
+      const key = item.name;
+      if (!itemMap[key]) itemMap[key] = { name: item.name, qty: 0, revenue: 0 };
+      itemMap[key].qty += item.quantity;
+      itemMap[key].revenue += item.price * item.quantity;
+    });
+  });
+  return Object.values(itemMap).sort((a, b) => b.qty - a.qty);
+}
+
+export function getCurrentSession() { return null; }
