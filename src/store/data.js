@@ -108,8 +108,7 @@ export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
 export async function createOrder(tableId, tableLabel, customerName, createdBy) {
   return dbInsert('orders', { 
-    id: crypto.randomUUID(), tableId, tableLabel, status: 'active', 
-    createdAt: new Date().toISOString(), createdBy 
+    id: crypto.randomUUID(), tableId, tableLabel, status: 'active', createdBy 
   });
 }
 

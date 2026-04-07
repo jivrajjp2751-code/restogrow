@@ -39,10 +39,9 @@ export default function MasterPortal() {
     const slug = name.toLowerCase().replace(/\s+/g, '-');
 
     try {
-      // 1. Create Restaurant
       const { data: rest, error: rError } = await supabase
         .from('restaurants')
-        .insert([{ name, slug, status: 'active', createdAt: new Date().toISOString() }])
+        .insert([{ name, slug, status: 'active' }])
         .select().single();
 
       if (rError) throw rError;
@@ -138,7 +137,7 @@ export default function MasterPortal() {
                       <td style={{ padding: '16px 24px', fontWeight: 600, color: '#0F172A' }}>{r.name}</td>
                       <td style={{ padding: '16px 24px', fontSize: '13px', color: '#64748B', fontFamily: 'monospace' }}>{r.id}</td>
                       <td style={{ padding: '16px 24px' }}><span className="badge badge-success" style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', background: '#D1FAE5', color: '#065F46', fontWeight: 600 }}>{r.status.toUpperCase()}</span></td>
-                      <td style={{ padding: '16px 24px', fontSize: '13px', color: '#64748B' }}>{new Date(r.createdAt).toLocaleDateString()}</td>
+                      <td style={{ padding: '16px 24px', fontSize: '13px', color: '#64748B' }}>{new Date(r.createdAt || r.created_at || new Date()).toLocaleDateString()}</td>
                       <td style={{ textAlign: 'right', paddingRight: '24px' }}>
                          <a href={`/#/login?rid=${r.id}`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', gap: '6px', display: 'inline-flex', alignItems: 'center', background: '#F1F5F9', color: '#334155', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, transition: 'all 0.2s' }}>
                            LOGIN AS ADMIN <ExternalLink size={14} />
