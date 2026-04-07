@@ -138,14 +138,23 @@ export async function generateBill(orderId, paymentMode, discount) {
 
 export async function getOrderForTable(tableId) {
   if (!_restaurantId) return null;
-  const { data } = await supabase
+  const { data: order } = await supabase
     .from('orders')
     .select('*')
     .eq('restaurant_id', _restaurantId)
     .eq('tableId', tableId)
     .eq('status', 'active')
-    .single();
-  return data || null;
+    .maybeSingle();
+    
+  if (!order) return null;
+
+  const { data: items } = await supabase
+    .from('order_items')
+    .select('*')
+    .eq('orderId', order.id);
+
+  order.items = items || [];
+  return order;
 }
 
 export async function updateOrderItem(orderId, itemId, data) {
