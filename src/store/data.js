@@ -160,8 +160,21 @@ export async function createOrder(tableId, tableLabel, customerName, createdBy) 
 }
 
 export async function cancelOrder(orderId, tableId) {
-  await dbUpdate('orders', orderId, { status: 'cancelled' });
-  await dbUpdate('tables', tableId, { status: 'available' });
+  // Update the specific order
+  if (orderId) {
+    await dbUpdate('orders', orderId, { status: 'cancelled' });
+  }
+  
+  // Also clean up any other dangling active orders for this table just in case crashes duplicated them
+  if (tableId && _restaurantId) {
+    await supabase.from('orders')
+      .update({ status: 'cancelled' })
+      .eq('restaurant_id', _restaurantId)
+      .eq('tableId', tableId)
+      .eq('status', 'active');
+      
+    await dbUpdate('tables', tableId, { status: 'available' });
+  }
 }
 
 export async function addItemToOrder(orderId, menuItem) {
@@ -238,8 +251,17 @@ export async function generateBill(orderId, paymentMode, discount) {
 
 export async function getOrderForTable(tableId) {
   if (!_restaurantId) return null;
-  const { data: order } = await supabase.from('orders').select('*').eq('restaurant_id', _restaurantId).eq('tableId', tableId).eq('status', 'active').maybeSingle();
-  if (!order) return null;
+  const { data: orders, error } = await supabase.from('orders')
+    .select('*')
+    .eq('restaurant_id', _restaurantId)
+    .eq('tableId', tableId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1);
+    
+  if (error || !orders || orders.length === 0) return null;
+  const order = orders[0];
+  
   const { data: items } = await supabase.from('order_items').select('*').eq('orderId', order.id);
   order.items = items || [];
   return order;
