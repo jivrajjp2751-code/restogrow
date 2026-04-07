@@ -168,10 +168,8 @@ export async function generateBill(orderId, paymentMode, discount) {
     id: billId,
     orderId: orderId,
     billNumber,
-    customerName: '', 
     total,
-    paymentMode,
-    subtotal
+    paymentMode
   });
 
   const billItems = items.map(item => ({
