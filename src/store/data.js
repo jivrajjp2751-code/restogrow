@@ -99,12 +99,24 @@ export async function addSection(data) { return dbInsert('sections', data); }
 export async function updateSection(id, data) { return dbUpdate('sections', id, data); }
 export async function deleteSection(id) { return dbDelete('sections', id); }
 
-export async function addCategory(data) { return dbInsert('categories', data); }
-export async function updateCategory(id, data) { return dbUpdate('categories', id, data); }
+export async function addCategory(data) { 
+  const { name, icon, type } = data;
+  return dbInsert('categories', { name, icon, type }); 
+}
+export async function updateCategory(id, data) { 
+  const { name, icon, type } = data;
+  return dbUpdate('categories', id, { name, icon, type }); 
+}
 export async function deleteCategory(id) { return dbDelete('categories', id); }
 
-export async function addMenuItem(data) { return dbInsert('menu_items', data); }
-export async function updateMenuItem(id, data) { return dbUpdate('menu_items', id, data); }
+export async function addMenuItem(data) { 
+  const { name, code, price, stock, categoryId } = data;
+  return dbInsert('menu_items', { name, code, price, stock, categoryId }); 
+}
+export async function updateMenuItem(id, data) { 
+  const { name, code, price, stock, categoryId } = data;
+  return dbUpdate('menu_items', id, { name, code, price, stock, categoryId }); 
+}
 export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
 export async function createOrder(tableId, tableLabel, customerName, createdBy) {
@@ -251,3 +263,53 @@ export function getMostSoldLiquor(month, bills, categories) {
 }
 
 export function getCurrentSession() { return null; }
+
+// ===== SEEDING HELPERS =====
+export async function injectFakeData() {
+  if (!_restaurantId) throw new Error('No restaurant selected');
+  
+  // 1. Categories
+  const cats = [
+    { name: 'Starters', icon: '🍟', type: 'kitchen' },
+    { name: 'Main Course', icon: '🍛', type: 'kitchen' },
+    { name: 'Desserts', icon: '🍰', type: 'kitchen' },
+    { name: 'Beers', icon: '🍺', type: 'bar' },
+    { name: 'Cocktails', icon: '🍸', type: 'bar' }
+  ];
+  
+  const createdCats = [];
+  for (const c of cats) {
+    createdCats.push(await addCategory(c));
+  }
+
+  // 2. Menu Items
+  const items = [
+    { catIdx: 0, name: 'French Fries', code: 'FF', price: 120, stock: 50 },
+    { catIdx: 0, name: 'Paneer Tikka', code: 'PT', price: 250, stock: 30 },
+    { catIdx: 1, name: 'Butter Chicken', code: 'BC', price: 380, stock: 40 },
+    { catIdx: 1, name: 'Dal Makhani', code: 'DM', price: 280, stock: 45 },
+    { catIdx: 2, name: 'Brownie Sizzler', code: 'BS', price: 220, stock: 25 },
+    { catIdx: 3, name: 'Kingfisher Premium', code: 'KP', price: 180, stock: 200 },
+    { catIdx: 3, name: 'Corona Extra', code: 'CE', price: 350, stock: 150 },
+    { catIdx: 4, name: 'Mojito', code: 'MO', price: 280, stock: 100 },
+    { catIdx: 4, name: 'Long Island Iced Tea', code: 'LIIT', price: 450, stock: 80 }
+  ];
+
+  for (const item of items) {
+    const parentCat = createdCats[item.catIdx];
+    await addMenuItem({
+      name: item.name, code: item.code, price: item.price, stock: item.stock, categoryId: parentCat.id
+    });
+  }
+
+  // 3. Sections & Tables
+  const s1 = await addSection({ name: 'Main Hall', color: '#6C5CE7', icon: '🍽️' });
+  const s2 = await addSection({ name: 'Lounge', color: '#E84393', icon: '✨' });
+
+  for (let i = 1; i <= 6; i++) {
+    await addTable({ sectionId: s1.id, number: i, label: `H${i}`, status: 'available' });
+  }
+  for (let i = 7; i <= 10; i++) {
+    await addTable({ sectionId: s2.id, number: i, label: `V${i}`, status: 'available' });
+  }
+}

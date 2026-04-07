@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp, useToast } from '../context/AppContext';
-import { updateConfig } from '../store/data';
+import { updateConfig, injectFakeData } from '../store/data';
 import { Settings, Store, Receipt, RefreshCw } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -54,19 +54,24 @@ export default function SettingsPage() {
       </div>
 
       <div className="config-section">
-        <h3 className="config-section-title">📋 OFFLINE SHARING</h3>
+        <h3 className="config-section-title">✨ DEMO & ONBOARDING</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '8px' }}>
-          This app works fully offline. To share it:
+          Generate a full set of sample Categories, Menu Items, Sections, and Tables to preview the system instantly.
         </p>
-        <ol style={{ color: 'var(--text-secondary)', fontSize: '11px', paddingLeft: '16px', lineHeight: 1.8 }}>
-          <li>Run <code style={{ background: 'var(--bg-tertiary)', padding: '2px 4px', borderRadius: '3px' }}>npm run build</code> in the terminal</li>
-          <li>Copy the entire <code style={{ background: 'var(--bg-tertiary)', padding: '2px 4px', borderRadius: '3px' }}>dist/</code> folder</li>
-          <li>Send it via pen drive, WhatsApp, or any file sharing</li>
-          <li>Open <code style={{ background: 'var(--bg-tertiary)', padding: '2px 4px', borderRadius: '3px' }}>dist/index.html</code> in any browser — NO internet needed!</li>
-        </ol>
-        <p style={{ color: 'var(--text-tertiary)', fontSize: '10px', marginTop: '8px' }}>
-          ℹ All data is stored locally in browser (localStorage). Each computer maintains its own data.
-        </p>
+        <button 
+          className="btn btn-primary" 
+          onClick={async () => {
+             try {
+                await injectFakeData();
+                refresh();
+                addToast('Demo data successfully generated!', 'success');
+             } catch(e) {
+                addToast(e.message, 'error');
+             }
+          }}
+        >
+          GENERATE SAMPLE DATA
+        </button>
       </div>
 
       <div className="config-section" style={{ borderColor: 'rgba(255,107,107,0.3)' }}>
