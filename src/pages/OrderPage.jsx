@@ -124,7 +124,14 @@ export default function OrderPage() {
 
   const handleGoToBilling = async () => {
     if (!order || safeItems.length === 0) { addToast('Add items first', 'warning'); return; }
-    navigate(`/billing/${order.id}`);
+    if (busy) return;
+    setBusy(true);
+    try {
+      await refresh();
+      navigate(`/billing/${order.id}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   // KOT print
