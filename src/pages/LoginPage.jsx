@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { authenticateUser } from '../store/data';
 import { Loader2, ShieldCheck, HelpCircle } from 'lucide-react';
@@ -10,9 +10,29 @@ export default function LoginPage() {
   const { addToast } = useToast();
 
   const handlePush = (digit) => {
-    if (pin.length < 4) setPin(pin + digit);
+    if (pin.length < 4) setPin(p => p + digit);
   };
   const handleClear = () => setPin('');
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!tenantId || loading) return;
+      if (e.key >= '0' && e.key <= '9') {
+        setPin(p => p.length < 4 ? p + e.key : p);
+      } else if (e.key === 'Backspace') {
+        setPin(p => p.slice(0, -1));
+      } else if (e.key === 'c' || e.key === 'C' || e.key === 'Delete') {
+        setPin('');
+      } else if (e.key === 'Enter') {
+        // Find the login button and click it to trigger the state-dependent login logic
+        const loginBtn = document.querySelector('.login-btn');
+        if (loginBtn && !loginBtn.disabled) loginBtn.click();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tenantId, loading]);
 
   const handleLogin = async () => {
     if (pin.length !== 4) return;
