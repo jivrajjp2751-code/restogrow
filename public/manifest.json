@@ -1,0 +1,18 @@
+{
+  "name": "RestoGrow POS",
+  "short_name": "RestoGrow",
+  "description": "Professional Multi-Tenant Cloud POS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F5F7",
+  "theme_color": "#F5F5F7",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

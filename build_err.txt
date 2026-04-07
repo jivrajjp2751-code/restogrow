@@ -1,0 +1,9 @@
+﻿  ΓÇó electron-builder  version=26.8.1 os=10.0.26200
+  Γ¿» ENOENT: no such file or directory, open 'C:\Users\Jeevesh\OneDrive\Desktop\Maifil\.compression=normal'  failedTask=build stackTrace=Error: ENOENT: no such file or directory, open 'C:\Users\Jeevesh\OneDrive\Desktop\Maifil\.compression=normal'
+    at open (node:internal/fs/promises:637:25)
+    at Object.readFile (node:internal/fs/promises:1269:14)
+    at readConfig (C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\app-builder-lib\src\util\config\load.ts:19:16)
+    at getConfig (C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\app-builder-lib\src\util\config\config.ts:43:34)
+    at Packager.validateConfig (C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\app-builder-lib\src\packager.ts:376:27)
+    at Packager.build (C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\app-builder-lib\src\packager.ts:406:5)
+    at executeFinally (C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\builder-util\src\promise.ts:12:14)

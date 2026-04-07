@@ -1,0 +1,167 @@
+﻿  ΓÇó electron-builder  version=26.8.1 os=10.0.26200
+  ΓÇó loaded configuration  file=package.json ("build" field)
+  ΓÇó @electron/rebuild already used by electron-builder, please consider to remove excess dependency from devDependencies
+
+To ensure your native dependencies are always matched electron version, simply add script `"postinstall": "electron-builder install-app-deps" to your `package.json`
+  ΓÇó executing @electron/rebuild  electronVersion=41.1.1 arch=x64 buildFromSource=false workspaceRoot=C:\Users\Jeevesh\OneDrive\Desktop\Maifil projectDir=./ appDir=./
+  ΓÇó installing native dependencies  arch=x64
+  ΓÇó completed installing native dependencies
+  ΓÇó packaging       platform=win32 arch=x64 electron=41.1.1 appOutDir=dist-electron\win-unpacked
+  ΓÇó searching for node modules  pm=npm searchDir=C:\Users\Jeevesh\OneDrive\Desktop\Maifil
+node.exe : (node:20076) 
+[DEP0190] 
+DeprecationWarning: 
+Passing args to a child 
+process with shell option 
+true can lead to security 
+vulnerabilities, as the 
+arguments are not escaped, 
+only concatenated.
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: ((no  
+  de:20076) [D...y conca   
+ tenated.:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+(Use `node 
+--trace-deprecation ...` 
+to show where the warning 
+was created)
+  ΓÇó collector stderr output  dependencies=["npm error code ELSPROBLEMS\nnpm error extraneous: @emnapi/wasi-threads@1.2.1 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\@emnapi\\wasi-threads\nnpm error extraneous: bindings@1.5.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\bindings\nnpm error extraneous: chownr@1.1.4 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\chownr\nnpm error extraneous: deep-extend@0.6.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\deep-extend\nnpm error extraneous: expand-template@2.0.3 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\expand-template\nnpm error extraneous: file-uri-to-path@1.0.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\file-uri-to-path\nnpm error extraneous: fs-constants@1.0.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\fs-constants\nnpm error extraneous: github-from-package@0.0.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\github-from-package\nnpm error extraneous: ini@1.3.8 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\ini\nnpm error extraneous: mkdirp-classic@0.5.3 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\mkdirp-classic\nnpm error extraneous: napi-build-utils@2.0.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\napi-build-utils\nnpm error extraneous: node-abi@3.89.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\node-abi\nnpm error extraneous: prebuild-install@7.1.3 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\prebuild-install\nnpm error extraneous: rc@1.2.8 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\rc\nnpm error invalid: react-dom@19.2.4 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\react-dom\nnpm error invalid: react@19.2.4 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\react\nnpm error extraneous: simple-concat@1.0.1 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\simple-concat\nnpm error extraneous: simple-get@4.0.1 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\simple-get\nnpm error extraneous: tar-fs@2.1.4 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\tar-fs\nnpm error extraneous: tar-stream@2.2.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\tar-stream\nnpm error extraneous: tunnel-agent@0.6.0 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\tunnel-agent\nnpm error extraneous: semver@7.7.4 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\node-abi\\node_modules\\semver\nnpm error extraneous: strip-json-comments@2.0.1 C:\\Users\\Jeevesh\\OneDrive\\Desktop\\Maifil\\node_modules\\rc\\node_modules\\strip-json-comments\nnpm error A complete log of this run can be found in: C:\\Users\\Jeevesh\\AppData\\Local\\npm-cache\\_logs\\2026-04-06T10_18_31_176Z-debug-0.log\n"]
+  ΓÇó duplicate dependency references  dependencies=["mime-types@3.0.2","debug@4.4.3","http-errors@2.0.1","on-finished@2.4.1","qs@6.15.0","http-errors@2.0.1","iconv-lite@0.7.2","type-is@2.0.1","debug@4.4.3","on-finished@2.4.1","get-intrinsic@1.3.0","call-bind-apply-helpers@1.0.2","call-bind-apply-helpers@1.0.2","es-object-atoms@1.1.1","call-bound@1.0.4","get-intrinsic@1.3.0","side-channel-map@1.0.1","debug@4.4.3","debug@4.4.3","http-errors@2.0.1","mime-types@3.0.2","on-finished@2.4.1","send@1.2.1","mime-types@3.0.2","node-abi@3.89.0","end-of-stream@1.4.5","once@1.4.0","rc@1.2.8","simple-get@4.0.1","tar-fs@2.1.4","tunnel-agent@0.6.0","string-width@4.2.3","string-width@4.2.3","strip-ansi@6.0.1","strip-ansi@6.0.1","react-dom@19.2.4","react-dom@19.2.4","react-redux@9.2.0","react-dom@19.2.4","d3-array@3.2.4","d3-interpolate@3.0.1","d3-time@3.1.0","d3-time@3.1.0","d3-array@3.2.4","once@1.4.0","debug@4.4.3","debug@4.4.3","debug@4.4.3","cors@2.8.6","debug@4.4.3","@types/node@25.5.2","@types/node@25.5.2","cors@2.8.6","debug@4.4.3","debug@4.4.3","socket.io-parser@4.2.6","pump@3.0.4","tar-stream@2.2.0","readable-stream@3.6.2","once@1.4.0"]
+  ΓÇó updating asar integrity executable resource  executablePath=dist-electron\win-unpacked\maifil.exe
+  ΓÇó default Electron icon is used  reason=application icon is not set
+  ΓÇó downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  ΓÇó downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=1.386s
+  Γ¿» cannot execute  cause=exit status 2
+                    out=
+    7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+    
+    Scanning the drive for archives:
+    1 file, 5635384 bytes (5504 KiB)
+    
+    Extracting archive: C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\776384131.7z
+    --
+    Path = C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\776384131.7z
+    Type = 7z
+    Physical Size = 5635384
+    Headers Size = 1492
+    Method = LZMA2:24m LZMA:20 BCJ2
+    Solid = +
+    Blocks = 2
+    
+    
+    Sub items Errors: 2
+    
+    Archives with Errors: 1
+    
+    Sub items Errors: 2
+    
+                    errorOut=ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\776384131\darwin\10.12\lib\libcrypto.dylib
+    ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\776384131\darwin\10.12\lib\libssl.dylib
+    
+                    command='C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\7zip-bin\win\x64\7za.exe' x -snld -bd 'C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\776384131.7z' '-oC:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\776384131'
+                    workingDir=C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign
+  ΓÇó downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  ΓÇó downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=895ms
+  Γ¿» cannot execute  cause=exit status 2
+                    out=
+    7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+    
+    Scanning the drive for archives:
+    1 file, 5635384 bytes (5504 KiB)
+    
+    Extracting archive: C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\255236031.7z
+    --
+    Path = C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\255236031.7z
+    Type = 7z
+    Physical Size = 5635384
+    Headers Size = 1492
+    Method = LZMA2:24m LZMA:20 BCJ2
+    Solid = +
+    Blocks = 2
+    
+    
+    Sub items Errors: 2
+    
+    Archives with Errors: 1
+    
+    Sub items Errors: 2
+    
+                    errorOut=ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\255236031\darwin\10.12\lib\libcrypto.dylib
+    ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\255236031\darwin\10.12\lib\libssl.dylib
+    
+                    command='C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\7zip-bin\win\x64\7za.exe' x -snld -bd 'C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\255236031.7z' '-oC:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\255236031'
+                    workingDir=C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign
+  ΓÇó downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  ΓÇó downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=1.011s
+  Γ¿» cannot execute  cause=exit status 2
+                    out=
+    7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+    
+    Scanning the drive for archives:
+    1 file, 5635384 bytes (5504 KiB)
+    
+    Extracting archive: C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\729396659.7z
+    --
+    Path = C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\729396659.7z
+    Type = 7z
+    Physical Size = 5635384
+    Headers Size = 1492
+    Method = LZMA2:24m LZMA:20 BCJ2
+    Solid = +
+    Blocks = 2
+    
+    
+    Sub items Errors: 2
+    
+    Archives with Errors: 1
+    
+    Sub items Errors: 2
+    
+                    errorOut=ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\729396659\darwin\10.12\lib\libcrypto.dylib
+    ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\729396659\darwin\10.12\lib\libssl.dylib
+    
+                    command='C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\7zip-bin\win\x64\7za.exe' x -snld -bd 'C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\729396659.7z' '-oC:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\729396659'
+                    workingDir=C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign
+  ΓÇó downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  ΓÇó downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=900ms
+  Γ¿» cannot execute  cause=exit status 2
+                    out=
+    7-Zip (a) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+    
+    Scanning the drive for archives:
+    1 file, 5635384 bytes (5504 KiB)
+    
+    Extracting archive: C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\004687667.7z
+    --
+    Path = C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\004687667.7z
+    Type = 7z
+    Physical Size = 5635384
+    Headers Size = 1492
+    Method = LZMA2:24m LZMA:20 BCJ2
+    Solid = +
+    Blocks = 2
+    
+    
+    Sub items Errors: 2
+    
+    Archives with Errors: 1
+    
+    Sub items Errors: 2
+    
+                    errorOut=ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\004687667\darwin\10.12\lib\libcrypto.dylib
+    ERROR: Cannot create symbolic link : A required privilege is not held by the client. : C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\004687667\darwin\10.12\lib\libssl.dylib
+    
+                    command='C:\Users\Jeevesh\OneDrive\Desktop\Maifil\node_modules\7zip-bin\win\x64\7za.exe' x -snld -bd 'C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\004687667.7z' '-oC:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign\004687667'
+                    workingDir=C:\Users\Jeevesh\AppData\Local\electron-builder\Cache\winCodeSign
