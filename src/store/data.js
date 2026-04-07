@@ -69,14 +69,30 @@ export async function syncAll() {
       }
     });
 
-    // Attach items to orders for UI convenience
+    // Map snake_case database records to camelCase for UI
     (results.orders || []).forEach(o => {
-      o.items = (results.order_items || []).filter(item => (item.orderId || item.order_id) === o.id);
+      o.tableId = o.tableId || o.table_id;
+      o.items = (results.order_items || []).filter(item => {
+        item.orderId = item.orderId || item.order_id;
+        item.menuItemId = item.menuItemId || item.menu_item_id;
+        item.categoryType = item.categoryType || item.category_type;
+        return item.orderId === o.id;
+      });
     });
     
-    // Attach items to bills for reports
     (results.bills || []).forEach(b => {
-      b.items = (results.bill_items || []).filter(item => (item.billId || item.bill_id) === b.id);
+      b.orderId = b.orderId || b.order_id;
+      b.billNumber = b.billNumber || b.bill_number;
+      b.paymentMode = b.paymentMode || b.payment_mode;
+      b.sessionId = b.sessionId || b.session_id;
+      b.createdAt = b.createdAt || b.created_at;
+      
+      b.items = (results.bill_items || []).filter(item => {
+        item.billId = item.billId || item.bill_id;
+        item.categoryType = item.categoryType || item.category_type;
+        item.quantity = item.quantity || item.qty || 0;
+        return item.billId === b.id;
+      });
     });
 
     return results;
@@ -180,14 +196,14 @@ export async function cancelOrder(orderId, tableId) {
 }
 
 export async function addItemToOrder(orderId, menuItem) {
-  // Only send columns that exist in the order_items table
+  // Use pure snake_case for database schema, mapping from camelCase UI variables
   return dbInsert('order_items', {
-    orderId: orderId,
-    menuItemId: menuItem.id,
+    order_id: orderId,
+    menu_item_id: menuItem.id,
     name: menuItem.name,
     price: menuItem.price,
     quantity: 1,
-    categoryType: menuItem.categoryType || 'bar'
+    category_type: menuItem.categoryType || 'bar'
   });
 }
 
@@ -196,14 +212,15 @@ export async function generateBill(orderId, paymentMode, discount) {
   const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).single();
   if (orderErr) throw orderErr;
   
-  const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('orderId', orderId);
+  // Must fetch with or filtering since existing data might only have camelCase or snakeCase
+  const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').or(`orderId.eq.${orderId},order_id.eq.${orderId}`);
   if (itemsErr) throw itemsErr;
 
   const { data: configData } = await supabase.from('config').select('*').eq('restaurant_id', _restaurantId);
   const cfg = { taxRate: 0, serviceChargeRate: 0, restaurantName: 'RestoGrow', currency: '₹' };
   configData?.forEach(r => { cfg[r.id] = r.value; });
 
-  const subtotal = items.reduce((s, i) => s + (i.price * i.quantity), 0);
+  const subtotal = items.reduce((s, i) => s + ((i.price||0) * (i.quantity||i.qty||0)), 0);
   const taxAmount = (subtotal * (cfg.taxRate || 0)) / 100;
   const serviceCharge = (subtotal * (cfg.serviceChargeRate || 0)) / 100;
   const discountAmount = (subtotal * (discount || 0)) / 100;
@@ -219,23 +236,24 @@ export async function generateBill(orderId, paymentMode, discount) {
   const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
   
-  // Only send columns that exist in the bills table
+  // Use pure snake_case
   const bill = await dbInsert('bills', {
     id: billId,
-    orderId: orderId,
-    billNumber,
+    order_id: orderId,
+    bill_number: billNumber,
     total,
-    paymentMode,
-    createdAt: new Date().toISOString()
+    payment_mode: paymentMode,
+    session_id: activeSession ? activeSession.id : null,
+    created_at: new Date().toISOString()
   });
 
-  // Only send columns that exist in the bill_items table
+  // Pure snake_case for bill items
   const billItems = items.map(item => ({
-    billId,
+    bill_id: billId,
     name: item.name,
     price: item.price,
-    quantity: item.quantity,
-    categoryType: item.categoryType || 'bar',
+    quantity: item.quantity || item.qty || 0,
+    category_type: item.categoryType || item.category_type || 'bar',
     restaurant_id: _restaurantId
   }));
   
@@ -247,11 +265,11 @@ export async function generateBill(orderId, paymentMode, discount) {
 
   // Deduct stock
   for (const item of items) {
-    const mid = item.menuItemId;
+    const mid = item.menuItemId || item.menu_item_id;
     if (!mid) continue;
     const { data: menuI } = await supabase.from('menu_items').select('stock').eq('id', mid).single();
     if (menuI) {
-      const newStock = Math.max(0, menuI.stock - item.quantity);
+      const newStock = Math.max(0, menuI.stock - (item.quantity || 1));
       await supabase.from('menu_items').update({ stock: newStock }).eq('id', mid);
     }
   }
@@ -408,9 +426,12 @@ export function getSessionBills(session, bills) {
     // Primary: match by sessionId
     if (b.sessionId && b.sessionId === sessionId) return true;
     
-    // Fallback: if bill has no sessionId, match by date
-    const bDate = (b.createdAt || b.created_at || '').substring(0, 10);
-    if (!b.sessionId && bDate && sDate && bDate === sDate) return true;
+    // Fallback: if bill has no sessionId, match by precise time window
+    const bDate = new Date(b.createdAt || b.created_at);
+    const sStart = new Date(session.startedAt);
+    const sEnd = session.endedAt ? new Date(session.endedAt) : new Date();
+    
+    if (!b.sessionId && bDate >= sStart && bDate <= sEnd) return true;
     
     return false;
   });
