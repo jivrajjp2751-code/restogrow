@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
-  createOrder, generateBill,
+  createOrder, generateBill, cancelOrder
 } from '../store/data';
 import { printSplitKOT, printBillDirect } from '../utils/print';
 import {
@@ -96,8 +96,7 @@ export default function StaffMobileDashboard() {
 
   const handleAddItem = async (menuItem) => {
     if (!order || busy) return;
-    const isOOS = menuItem.stock !== undefined && menuItem.stock !== null && menuItem.stock <= 0;
-    if (isOOS) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
+    // Removed strict stock check to allow adding items when inventory isn't explicitly tracked
 
     setBusy(true);
     try {
@@ -145,6 +144,22 @@ export default function StaffMobileDashboard() {
       setNoteText('');
     } catch (e) { addToast(e.message || 'Failed', 'error'); }
     finally { setBusy(false); }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!order || busy) return;
+    if (!window.confirm('Cancel this order and free the table?')) return;
+    setBusy(true);
+    try {
+      await cancelOrder(order.id, selectedTableId);
+      await refresh();
+      addToast('Order cancelled', 'info');
+      handleBack();
+    } catch (e) {
+      addToast('Failed: ' + (e.message || ''), 'error');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handlePrintSplitKOT = () => {
@@ -301,6 +316,7 @@ export default function StaffMobileDashboard() {
       </div>
 
       {safeItems.length > 0 && (
+        <>
         <div className="staff-order-items">
           <div className="staff-order-items-header">
             <span>ORDER ({safeItems.length})</span>
@@ -323,6 +339,12 @@ export default function StaffMobileDashboard() {
             )}
           </div>
         </div>
+        <div style={{ padding: '0 12px 12px 12px' }}>
+            <button className="btn btn-ghost" style={{ color: 'var(--brand-danger)', width: '100%', fontSize: '12px' }} onClick={handleCancelOrder} disabled={busy}>
+              CANCEL ORDER
+            </button>
+        </div>
+        </>
       )}
 
       <div className="staff-menu-search">
@@ -353,7 +375,7 @@ export default function StaffMobileDashboard() {
 
       <div className="staff-menu-grid">
         {filteredItems.map(item => {
-          const isOOS = item.stock !== undefined && item.stock !== null && item.stock <= 0;
+          const isOOS = false; // Bypass OOS completely so items can be selected unconditionally
           return (
             <div
               key={item.id}

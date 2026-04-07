@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
 import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
-  createOrder, generateBill,
+  createOrder, generateBill, cancelOrder
 } from '../store/data';
 import { printSplitKOT, printKitchenKOT, printBarKOT, printBillDirect } from '../utils/print';
 import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, Wine, Coffee, CreditCard, Banknote, Smartphone, Receipt } from 'lucide-react';
@@ -78,8 +78,6 @@ export default function OrderPage() {
 
   const handleAddItem = async (menuItem) => {
     if (!order || busy) return;
-    const isOOS = menuItem.stock !== undefined && menuItem.stock !== null && menuItem.stock <= 0;
-    if (isOOS) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
     setBusy(true);
     try {
       const cat = (categories || []).find(c => c.id === menuItem.categoryId);
@@ -162,6 +160,22 @@ export default function OrderPage() {
   };
 
   // Direct bill
+  const handleCancelOrder = async () => {
+    if (!order || busy) return;
+    if (!window.confirm('Cancel this order and free the table?')) return;
+    setBusy(true);
+    try {
+      await cancelOrder(order.id, table.id);
+      await refresh();
+      addToast('Order cancelled', 'info');
+      navigate('/tables');
+    } catch (e) {
+      addToast('Failed: ' + (e.message || ''), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDirectBill = async () => {
     if (!order || safeItems.length === 0 || busy) return;
     setBusy(true);
@@ -210,7 +224,9 @@ export default function OrderPage() {
   }
 
   const renderItemCard = (item) => {
-    const isOOS = item.stock !== undefined && item.stock !== null && item.stock <= 0;
+    // Only gray out if they are actively using stock tracking (e.g. stock <= 0 and they manually manage it)
+    // To prevent false blockages, we won't block clicking here anymore.
+    const isOOS = false; // Bypass visual OOS for now so users can select unconditionally
     return (
       <div
         key={item.id}
@@ -373,15 +389,10 @@ export default function OrderPage() {
           )}
         </div>
 
-        {safeItems.length > 0 && (
-          <>
-            <div className="order-summary">
-              <div className="order-summary-row"><span>Subtotal</span><span>{config.currency}{subtotal}</span></div>
-              {(config.taxRate || 0) > 0 && <div className="order-summary-row"><span>Tax {config.taxRate}%</span><span>{config.currency}{Math.round(tax)}</span></div>}
-              {(config.serviceChargeRate || 0) > 0 && <div className="order-summary-row"><span>Service {config.serviceChargeRate}%</span><span>{config.currency}{Math.round(serviceCharge)}</span></div>}
-              <div className="order-summary-row total"><span>TOTAL</span><span>{config.currency}{Math.round(total)}</span></div>
-            </div>
-            <div className="order-actions" style={{ gridTemplateColumns: isAdmin ? '1fr 1fr 1fr' : '1fr 1fr' }}>
+        {/* Order Actions */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', padding: '12px' }}>
+          {safeItems.length > 0 && (
+            <div className="order-actions" style={{ gridTemplateColumns: isAdmin ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
               <button className="btn btn-secondary btn-lg" onClick={handlePrintSplitKOT}><Printer size={14} /> KOT</button>
               {isAdmin && (
                 <button className="btn btn-warning btn-lg" onClick={() => setDirectBillModal(true)} title="Direct bill without KOT">
@@ -390,8 +401,11 @@ export default function OrderPage() {
               )}
               <button className="btn btn-success btn-lg" onClick={handleGoToBilling}>BILL</button>
             </div>
-          </>
-        )}
+          )}
+          <button className="btn btn-ghost" style={{ color: 'var(--brand-danger)', width: '100%' }} onClick={handleCancelOrder} disabled={busy}>
+             CANCEL ORDER
+          </button>
+        </div>
       </div>
 
       {/* Note Modal */}

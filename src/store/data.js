@@ -151,9 +151,17 @@ export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
 export async function createOrder(tableId, tableLabel, customerName, createdBy) {
   // customerName is not in the orders table, skipping for now
-  return dbInsert('orders', { 
-    id: getUUID(), tableId: tableId, tableLabel, status: 'active', createdBy,
+  const orderId = getUUID();
+  const order = await dbInsert('orders', { 
+    id: orderId, tableId: tableId, tableLabel, status: 'active', createdBy,
   });
+  await dbUpdate('tables', tableId, { status: 'occupied', customerName });
+  return order;
+}
+
+export async function cancelOrder(orderId, tableId) {
+  await dbUpdate('orders', orderId, { status: 'cancelled' });
+  await dbUpdate('tables', tableId, { status: 'available', customerName: '' });
 }
 
 export async function addItemToOrder(orderId, menuItem) {
