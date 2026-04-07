@@ -5,12 +5,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './',  // Relative paths so dist/ works offline from file://
+  resolve: {
+    alias: {
+      tslib: 'tslib/tslib.es6.js'
+    }
+  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    rollupOptions: {
-      external: ['tslib']
-    }
   },
   optimizeDeps: {
     include: ['@supabase/supabase-js', 'tslib']
