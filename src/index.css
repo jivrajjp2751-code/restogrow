@@ -1776,3 +1776,67 @@ ul, ol { list-style: none; }
   .settings-grid { grid-template-columns: 1fr; }
 }
 
+/* ===== LOGIN & PIN KEYPAD ===== */
+.login-container {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100vh; width: 100%; background: #1A1B2E; color: white;
+  background-image: radial-gradient(circle at top right, #2D2B52 0%, #1A1B2E 100%);
+  font-family: var(--font-ui);
+}
+
+.login-card {
+  background: rgba(255, 255, 255, 0.05); padding: 40px; border-radius: 24px;
+  backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2); width: 360px;
+  display: flex; flex-direction: column; align-items: center;
+  animation: slideUp 0.4s ease;
+}
+
+.login-header { text-align: center; margin-bottom: 32px; }
+.login-header h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; letter-spacing: 0.5px; }
+.login-header p { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+
+.resto-logo-small {
+  width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 20px;
+  background: linear-gradient(135deg, #6C5CE7, #00CEC9);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 800; color: white;
+  box-shadow: 0 8px 24px rgba(108, 92, 231, 0.4);
+}
+
+.resto-logo-spin {
+  width: 80px; height: 80px; border-radius: 24px; margin: 0 auto;
+  background: linear-gradient(135deg, #6C5CE7, #00CEC9);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px; font-weight: 800; color: white;
+  box-shadow: 0 12px 32px rgba(108, 92, 231, 0.4);
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.pin-dots { display: flex; gap: 16px; margin-bottom: 40px; }
+.pin-dots .dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pin-dots .dot.active { background: #00CEC9; border-color: #00CEC9; transform: scale(1.3); box-shadow: 0 0 12px rgba(0, 206, 201, 0.6); }
+
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; margin-bottom: 32px; }
+.keypad .key {
+  width: 72px; height: 72px; border-radius: 50%; margin: 0 auto;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white; font-size: 24px; font-weight: 600; font-family: var(--font-mono);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s ease; cursor: pointer; user-select: none;
+}
+.keypad .key:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.2); }
+.keypad .key.clear { color: #FF7675; font-size: 20px; font-weight: 800; }
+.keypad .key.login-btn { background: #6C5CE7; border-color: #6C5CE7; color: white; }
+.keypad .key.login-btn:disabled { background: rgba(108, 92, 231, 0.3); border-color: transparent; color: rgba(255, 255, 255, 0.3); transform: none; cursor: not-allowed; }
+
+.login-footer {
+  display: flex; align-items: center; gap: 8px; font-size: 12px;
+  color: rgba(255, 255, 255, 0.5); font-weight: 500;
+}
+
+
