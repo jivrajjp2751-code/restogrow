@@ -49,23 +49,6 @@ export default function LoginPage() {
     }
   };
 
-  if (!tenantId) {
-    return (
-      <div className="login-container splash" style={{ textAlign: 'center', padding: '40px' }}>
-        <div className="resto-logo-spin" style={{ marginBottom: '24px' }}>RG</div>
-        <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#fff', marginBottom: '12px' }}>RestoGrow POS</h1>
-        <div style={{ background: 'rgba(255,255,255,0.05)', padding: '24px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <ShieldCheck size={40} style={{ color: '#6C5CE7', marginBottom: '12px' }} />
-          <p style={{ color: '#5A5E73', fontSize: '14px', lineHeight: 1.6 }}>
-             This is a private RestoGrow terminal.<br/>
-             Please open your <b>assigned restaurant link</b> to access the PIN keypad.
-          </p>
-        </div>
-        <p style={{ color: '#31344B', fontSize: '11px', marginTop: '40px' }}>&copy; 2026 RestoGrow Cloud Platforms</p>
-      </div>
-    );
-  }
-
   return (
     <div className="login-container">
       <div className="login-card">

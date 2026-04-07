@@ -228,7 +228,7 @@ export default function SessionPage() {
     <div className="page-content">
       <div className="session-hero">
         <div className="session-branding">
-          <div className="session-logo">M</div>
+          <div className="session-logo">RG</div>
           <h1 className="session-title">{config.restaurantName || 'RestoGrow POS'}</h1>
           <p className="session-date">{formatDate(new Date().toISOString())} — {new Date().toLocaleDateString('en-IN', { weekday: 'long' })}</p>
         </div>

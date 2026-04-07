@@ -163,7 +163,7 @@ export default function StaffMobileDashboard() {
       <div className="staff-mobile">
         <div className="staff-mobile-header">
           <div className="staff-mobile-brand">
-            <div className="staff-brand-icon">M</div>
+            <div className="staff-brand-icon">RG</div>
             <div>
               <div className="staff-brand-name">{config.restaurantName || 'RestoGrow'}</div>
               <div className="staff-brand-sub">

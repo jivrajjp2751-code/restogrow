@@ -86,11 +86,20 @@ export function AppProvider({ children }) {
   const login = useCallback(async (user) => {
     setCurrentUser(user);
     localStorage.setItem('rg_current_user', JSON.stringify(user));
+    if (user.restaurant_id) {
+      setTenantId(user.restaurant_id);
+      localStorage.setItem('rg_tenant_id', user.restaurant_id);
+      setTenant(user.restaurant_id);
+    }
   }, []);
 
   const logout = useCallback(() => {
     setCurrentUser(null);
     localStorage.removeItem('rg_current_user');
+    setTenantId(null);
+    localStorage.removeItem('rg_tenant_id');
+    setTenant(null);
+    window.location.hash = '/'; // Redirect to login
   }, []);
 
   const refresh = useCallback(async () => { await loadData(); }, [loadData]);

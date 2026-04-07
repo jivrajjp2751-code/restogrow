@@ -28,11 +28,6 @@ function ProtectedLayout() {
     );
   }
 
-  // If no tenant is selected, we might show a 'Contact Sales' page or simple login
-  if (!tenantId && window.location.hash !== '#/jivesh') {
-     return <div className="no-tenant">Please use your uniquely assigned RestoGrow link to log in.</div>;
-  }
-
   if (!currentUser && window.location.hash !== '#/jivesh') {
     return <LoginPage />;
   }

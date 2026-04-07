@@ -24,7 +24,7 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand-icon" title="RestoGrow POS">M</div>
+      <div className="sidebar-brand-icon" title="RestoGrow POS">RG</div>
 
       <nav className="sidebar-nav">
         {visibleItems.map((item) => (

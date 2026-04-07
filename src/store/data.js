@@ -13,16 +13,17 @@ export function getTenant() {
 
 // ===== AUTH =====
 export async function authenticateUser(pin) {
-  if (!_restaurantId) throw new Error('No restaurant selected');
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('restaurant_id', _restaurantId)
-    .eq('pin', pin)
-    .single();
+    .eq('pin', pin);
 
-  if (error || !data) throw new Error('Invalid PIN');
-  return data;
+  if (error || !data || data.length === 0) throw new Error('Invalid or Unrecognized PIN');
+  if (data.length > 1) throw new Error('PIN Conflict: Multiple users have this PIN. Please ask your administrator to give you a more unique PIN.');
+
+  const user = data[0];
+  setTenant(user.restaurant_id);
+  return user;
 }
 
 // ===== MULTI-TENANT DATA SYNC =====
