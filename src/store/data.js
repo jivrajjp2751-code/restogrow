@@ -174,7 +174,6 @@ export async function generateBill(orderId, paymentMode, discount) {
     subtotal,
     taxRate: cfg.taxRate,
     taxAmount,
-    discount,
     discountAmount
   });
 
