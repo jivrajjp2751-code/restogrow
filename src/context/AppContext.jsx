@@ -40,11 +40,12 @@ export function AppProvider({ children }) {
   });
 
   const [data, setData] = useState({
-    tables: [], sections: [], categories: [], menuItems: [], orders: [], bills: [], users: [], sessions: [],
+    tables: [], sections: [], categories: [], menu_items: [], users: [], orders: [], order_items: [], bills: [], bill_items: [], sessions: [],
     config: { restaurantName: 'RestoGrow', currency: '₹', taxRate: 0, serviceChargeRate: 0 }
   });
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Check URL for RID (Restaurant ID)
   useEffect(() => {
@@ -64,13 +65,24 @@ export function AppProvider({ children }) {
       setLoading(false);
       return;
     }
+    setRefreshing(true);
     try {
       const result = await syncAll();
-      if (result) setData(result);
-      setLoading(false);
+      if (result) {
+        setData(prev => {
+          // Merge logic: only overwrite if result has data for that table
+          const newData = { ...prev };
+          Object.keys(result).forEach(k => {
+            if (result[k] !== undefined) newData[k] = result[k];
+          });
+          return newData;
+        });
+      }
     } catch (err) {
       console.error('Sync error:', err);
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -118,9 +130,11 @@ export function AppProvider({ children }) {
       bills: data.bills,
       users: data.users,
       sessions: data.sessions,
+      inventory_log: data.inventory_log || [],
       currentSession,
       refresh,
-      loading
+      loading,
+      refreshing
     }}>
       {children}
     </AppContext.Provider>

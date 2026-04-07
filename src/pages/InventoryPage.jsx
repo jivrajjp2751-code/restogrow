@@ -4,7 +4,7 @@ import { addStock, addMenuItem, addCategory, updateCategory, deleteCategory, get
 import { Package, AlertTriangle, Plus, Search, PlusCircle, Wine, Coffee, Edit3, Trash2 } from 'lucide-react';
 
 export default function InventoryPage() {
-  const { menuItems, categories, config, refresh, currentUser } = useApp();
+  const { menuItems, inventory_log, categories, config, refresh, currentUser } = useApp();
   const { addToast } = useToast();
   const isAdmin = currentUser?.role === 'admin';
 
@@ -20,8 +20,8 @@ export default function InventoryPage() {
   const [catModal, setCatModal] = useState(null);
   const [catForm, setCatForm] = useState({ name: '', color: '#6C5CE7', icon: '🍽️', shortcut: '', type: 'bar' });
 
-  const lowStockItems = getLowStockItems();
-  const inventoryLog = getInventoryLog().reverse().slice(0, 50);
+  const lowStockItems = getLowStockItems(menuItems);
+  const inventoryLog = getInventoryLog(inventory_log).reverse().slice(0, 50);
 
   // Classify categories
   const barCats = categories.filter(c => c.type === 'bar');

@@ -33,32 +33,47 @@ export async function syncAll() {
   const tables = ['tables', 'sections', 'categories', 'menu_items', 'users', 'orders', 'order_items', 'bills', 'bill_items', 'sessions', 'config'];
   const results = {};
 
-  for (const table of tables) {
-    const { data } = await supabase
-      .from(table)
-      .select('*')
-      .eq('restaurant_id', _restaurantId);
+  try {
+    const fetchPromises = tables.map(table => 
+      supabase.from(table).select('*').eq('restaurant_id', _restaurantId)
+    );
     
-    if (table === 'config') {
-      const cfg = { restaurantName: 'RestoGrow', currency: '₹', taxRate: 0, serviceChargeRate: 0 };
-      (data || []).forEach(r => {
-        try { cfg[r.id] = JSON.parse(r.value); } catch { cfg[r.id] = r.value; }
-      });
-      results.config = cfg;
-    } else {
-      results[table] = data || [];
-    }
-  }
-  
-  // Attach items to orders for UI convenience
-  (results.orders || []).forEach(o => {
-    o.items = (results.order_items || []).filter(item => item.orderId === o.id);
-  });
-  (results.bills || []).forEach(b => {
-    b.items = (results.bill_items || []).filter(item => item.billId === b.id);
-  });
+    const responses = await Promise.all(fetchPromises);
+    
+    responses.forEach((res, index) => {
+      const tableName = tables[index];
+      if (res.error) {
+        console.error(`Error fetching ${tableName}:`, res.error);
+        return; // Don't add this key to results, preservings old data in AppContext
+      }
+      
+      if (!res.data) return;
 
-  return results;
+      if (tableName === 'config') {
+        const cfg = { restaurantName: 'RestoGrow', currency: '₹', taxRate: 0, serviceChargeRate: 0 };
+        res.data.forEach(r => {
+          try { cfg[r.id] = JSON.parse(r.value); } catch { cfg[r.id] = r.value; }
+        });
+        results.config = cfg;
+      } else {
+        results[tableName] = res.data;
+      }
+    });
+
+
+    // Attach items to orders for UI convenience
+    (results.orders || []).forEach(o => {
+      o.items = (results.order_items || []).filter(item => item.orderId === o.id);
+    });
+    (results.bills || []).forEach(b => {
+      b.items = (results.bill_items || []).filter(item => item.billId === b.id);
+    });
+
+    return results;
+  } catch (err) {
+    console.error('syncAll critical error:', err);
+    return null;
+  }
 }
 
 // ===== GENERIC HELPERS =====
@@ -196,6 +211,7 @@ export async function generateBill(orderId, paymentMode, discount) {
     bill: { 
       ...bill, 
       items, 
+      discount,
       tableNumber: order.tableLabel,
       restaurantName: cfg.restaurantName,
       currency: cfg.currency
@@ -298,12 +314,12 @@ export function getSessionBills(sessionId, bills) {
   return (bills || []).filter(b => b.sessionId === sessionId);
 }
 
-// Client-side computed helpers (legacy support)
-export function getInventoryLog() { return []; }
-export function getLowStockItems() { return []; }
-export function getBills() { return []; }
-export function getCategories() { return []; }
-export function getSessions() { return []; }
+// Client-side computed helpers
+export function getInventoryLog(logs) { return logs || []; }
+export function getLowStockItems(items) { return (items || []).filter(i => (i.stock || 0) <= 10); }
+export function getBills(bills) { return bills || []; }
+export function getCategories(categories) { return categories || []; }
+export function getSessions(sessions) { return sessions || []; }
 
 export function getMonthBills(month, bills) {
   if (!bills) return [];

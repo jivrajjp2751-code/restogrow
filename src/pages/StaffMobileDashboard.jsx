@@ -161,7 +161,7 @@ export default function StaffMobileDashboard() {
   if (!selectedTable) {
     return (
       <div className="staff-mobile">
-        <div className="staff-mobile-header">
+        <div className="staff-mobile-header" style={{ position: 'sticky', top: 0, zIndex: 100 }}>
           <div className="staff-mobile-brand">
             <div className="staff-brand-icon">RG</div>
             <div>
@@ -174,35 +174,52 @@ export default function StaffMobileDashboard() {
               </div>
             </div>
           </div>
-          <button className="staff-logout-btn" onClick={logout}><LogOut size={16} /></button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="staff-sync-btn" onClick={refresh} title="Manual Refresh">
+              <Plus size={16} className={refreshing ? 'spin' : ''} />
+            </button>
+            <button className="staff-logout-btn" onClick={logout}><LogOut size={16} /></button>
+          </div>
         </div>
 
-        <div className="staff-tables-scroll">
-          {sections.map(section => {
-            const sectionTables = tables.filter(t => t.sectionId === section.id);
-            if (sectionTables.length === 0) return null;
-            return (
-              <div key={section.id} className="staff-section">
-                <div className="staff-section-header" style={{ '--sec-color': section.color }}>
-                  <span>{section.icon} {section.name}</span>
-                  <span className="staff-section-count">{sectionTables.filter(t => t.status === 'occupied').length}/{sectionTables.length}</span>
-                </div>
-                <div className="staff-table-grid">
-                  {sectionTables.map(table => (
-                    <div key={table.id} className={`staff-table-card ${table.status}`} onClick={() => handleTableClick(table)}>
-                      <div className="staff-table-label">{table.label}</div>
-                      <div className={`staff-table-status ${table.status}`}>
-                        {table.status === 'available' ? 'FREE' : table.status === 'occupied' ? 'BUSY' : table.status.toUpperCase()}
-                      </div>
-                      {table.customerName && <div className="staff-table-customer">{table.customerName}</div>}
-                    </div>
-                  ))}
-                </div>
+        {refreshing && tables.length === 0 ? (
+          <div className="staff-loading">
+            <div className="resto-logo-spin">RG</div>
+            <p>Syncing Cloud Data...</p>
+          </div>
+        ) : (
+          <div className="staff-tables-scroll">
+            {sections.length === 0 && (
+              <div className="staff-empty-state">
+                <p>No sections found</p>
+                <button className="btn btn-secondary" onClick={refresh}>Try Re-syncing</button>
               </div>
-            );
-          })}
-        </div>
-
+            )}
+            {sections.map(section => {
+              const sectionTables = tables.filter(t => t.sectionId === section.id);
+              if (sectionTables.length === 0) return null;
+              return (
+                <div key={section.id} className="staff-section">
+                  <div className="staff-section-header" style={{ '--sec-color': section.color }}>
+                    <span>{section.icon} {section.name}</span>
+                    <span className="staff-section-count">{sectionTables.filter(t => t.status === 'occupied').length}/{sectionTables.length}</span>
+                  </div>
+                  <div className="staff-table-grid">
+                    {sectionTables.map(table => (
+                      <div key={table.id} className={`staff-table-card ${table.status}`} onClick={() => handleTableClick(table)}>
+                        <div className="staff-table-label">{table.label}</div>
+                        <div className={`staff-table-status ${table.status}`}>
+                          {table.status === 'available' ? 'FREE' : table.status === 'occupied' ? 'BUSY' : table.status.toUpperCase()}
+                        </div>
+                        {table.customerName && <div className="staff-table-customer">{table.customerName}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {customerModal && (
           <div className="modal-backdrop" onClick={() => setCustomerModal(null)}>
             <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '360px' }}>
