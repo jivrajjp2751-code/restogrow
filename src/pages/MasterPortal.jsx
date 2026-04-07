@@ -18,7 +18,7 @@ export default function MasterPortal() {
     setDbError('');
     try {
       if (!supabase) throw new Error("Supabase client not initialized. Check Env Vars.");
-      const { data: res, error } = await supabase.from('restaurants').select('*');
+      const { data: res, error } = await supabase.from('restaurants').select('*, users(email, password, role)');
       if (error) throw error;
       setRestaurants(res || []);
       setStats({
@@ -68,6 +68,17 @@ export default function MasterPortal() {
       fetchData();
     } catch (err) {
       alert('Error creating restaurant: ' + (err.message || 'Check database connection.'));
+    }
+  };
+
+  const deleteRestaurant = async (id, name) => {
+    if (!window.confirm(`WARNING: Are you absolutely sure you want to delete ${name}? This will permanently wipe all users, orders, bills, and data for this hotel.`)) return;
+    try {
+      const { error } = await supabase.from('restaurants').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (e) {
+      alert('Error deleting: ' + e.message);
     }
   };
 
@@ -126,10 +137,10 @@ export default function MasterPortal() {
               <thead>
                 <tr style={{ background: '#F8FAFC' }}>
                    <th style={{ padding: '16px 24px', color: '#64748B', fontWeight: 600, fontSize: '12px' }}>NAME</th>
-                   <th style={{ padding: '16px 24px', color: '#64748B', fontWeight: 600, fontSize: '12px' }}>TENANT ID</th>
+                   <th style={{ padding: '16px 24px', color: '#64748B', fontWeight: 600, fontSize: '12px' }}>ADMIN CREDS</th>
                    <th style={{ padding: '16px 24px', color: '#64748B', fontWeight: 600, fontSize: '12px' }}>STATUS</th>
                    <th style={{ padding: '16px 24px', color: '#64748B', fontWeight: 600, fontSize: '12px' }}>CREATED</th>
-                   <th style={{ textAlign: 'right', paddingRight: '24px', color: '#64748B', fontWeight: 600, fontSize: '12px' }}>ACCESS</th>
+                   <th style={{ textAlign: 'right', paddingRight: '24px', color: '#64748B', fontWeight: 600, fontSize: '12px' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -138,19 +149,26 @@ export default function MasterPortal() {
                     <td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>No restaurants deployed yet. Click 'New Restaurant' to begin.</td>
                   </tr>
                 ) : (
-                  restaurants.map(r => (
+                  restaurants.map(r => {
+                    const adminUser = r.users?.find(u => u.role === 'admin') || r.users?.[0];
+                    return (
                     <tr key={r.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                       <td style={{ padding: '16px 24px', fontWeight: 600, color: '#0F172A' }}>{r.name}</td>
-                      <td style={{ padding: '16px 24px', fontSize: '13px', color: '#64748B', fontFamily: 'monospace' }}>{r.id}</td>
+                      <td style={{ padding: '16px 24px', fontSize: '12px', color: '#334155', fontFamily: 'monospace' }}>
+                         {adminUser ? ( <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><div><b>U:</b> {adminUser.email}</div><div><b>P:</b> {adminUser.password}</div></div> ) : <span style={{ color: '#94A3B8' }}>None</span>}
+                      </td>
                       <td style={{ padding: '16px 24px' }}><span className="badge badge-success" style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', background: '#D1FAE5', color: '#065F46', fontWeight: 600 }}>{r.status.toUpperCase()}</span></td>
                       <td style={{ padding: '16px 24px', fontSize: '13px', color: '#64748B' }}>{new Date(r.createdAt || r.created_at || new Date()).toLocaleDateString()}</td>
                       <td style={{ textAlign: 'right', paddingRight: '24px' }}>
-                         <a href={`/#/login`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', gap: '6px', display: 'inline-flex', alignItems: 'center', background: '#F1F5F9', color: '#334155', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, transition: 'all 0.2s' }}>
-                           LOGIN AS ADMIN <ExternalLink size={14} />
-                         </a>
+                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                           <button onClick={(e) => { e.preventDefault(); deleteRestaurant(r.id, r.name); }} style={{ color: '#EF4444', background: '#FEF2F2', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', transition: '0.2s' }}>DELETE</button>
+                           <a href={`/#/login`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', gap: '6px', display: 'inline-flex', alignItems: 'center', background: '#F1F5F9', color: '#334155', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, transition: 'all 0.2s' }}>
+                             LOGIN <ExternalLink size={14} />
+                           </a>
+                         </div>
                       </td>
                     </tr>
-                  ))
+                  )})
                 )}
               </tbody>
             </table>
