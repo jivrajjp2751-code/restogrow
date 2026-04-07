@@ -226,7 +226,6 @@ export async function generateBill(orderId, paymentMode, discount) {
     billNumber,
     total,
     paymentMode,
-    sessionId: activeSession ? activeSession.id : null,
     createdAt: new Date().toISOString()
   });
 
