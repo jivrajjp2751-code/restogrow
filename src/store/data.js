@@ -12,15 +12,15 @@ export function getTenant() {
 }
 
 // ===== AUTH =====
-export async function authenticateUser(pin) {
+export async function authenticateUser(email, password) {
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('pin', pin);
+    .eq('email', email)
+    .eq('password', password);
 
-  if (error || !data || data.length === 0) throw new Error('Invalid or Unrecognized PIN');
-  if (data.length > 1) throw new Error('PIN Conflict: Multiple users have this PIN. Please ask your administrator to give you a more unique PIN.');
-
+  if (error || !data || data.length === 0) throw new Error('Invalid email or password');
+  
   const user = data[0];
   setTenant(user.restaurant_id);
   return user;

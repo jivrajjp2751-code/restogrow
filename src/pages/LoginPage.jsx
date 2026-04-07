@@ -1,49 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { authenticateUser } from '../store/data';
-import { Loader2, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Loader2, ShieldCheck, Mail, Lock } from 'lucide-react';
 
 export default function LoginPage() {
-  const [pin, setPin] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, config, tenantId } = useApp();
+  const { login } = useApp();
   const { addToast } = useToast();
 
-  const handlePush = (digit) => {
-    if (pin.length < 4) setPin(p => p + digit);
-  };
-  const handleClear = () => setPin('');
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (!tenantId || loading) return;
-      if (e.key >= '0' && e.key <= '9') {
-        setPin(p => p.length < 4 ? p + e.key : p);
-      } else if (e.key === 'Backspace') {
-        setPin(p => p.slice(0, -1));
-      } else if (e.key === 'c' || e.key === 'C' || e.key === 'Delete') {
-        setPin('');
-      } else if (e.key === 'Enter') {
-        // Find the login button and click it to trigger the state-dependent login logic
-        const loginBtn = document.querySelector('.login-btn');
-        if (loginBtn && !loginBtn.disabled) loginBtn.click();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tenantId, loading]);
-
-  const handleLogin = async () => {
-    if (pin.length !== 4) return;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!email || !password) return;
     setLoading(true);
     try {
-      const user = await authenticateUser(pin);
-      login(user);
-      addToast(`Welcome back, ${user.name}!`, 'success');
+      const user = await authenticateUser(email, password);
+      login(user); // AppContext handles tenant routing automatically
+      addToast(`Welcome back!`, 'success');
     } catch (err) {
       addToast(err.message, 'error');
-      setPin('');
+      setPassword('');
     } finally {
       setLoading(false);
     }
@@ -51,36 +28,62 @@ export default function LoginPage() {
 
   return (
     <div className="login-container">
-      <div className="login-card">
+      <div className="login-card" style={{ width: '400px', padding: '48px 40px' }}>
         <div className="login-header">
-           <div className="resto-logo-small">RG</div>
-           <h2>{config.restaurantName || 'RestoGrow POS'}</h2>
-           <p>Enter your personnel PIN</p>
+           <div className="resto-logo-spin">RG</div>
+           <h2 style={{ marginTop: '24px' }}>RestoGrow Access</h2>
+           <p>Enter your hotel credentials</p>
         </div>
 
-        <div className="pin-dots">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className={`dot ${pin.length > i ? 'active' : ''}`} />
-          ))}
-        </div>
+        <form onSubmit={handleLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+             <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: '8px', textTransform: 'uppercase' }}>Email Address</label>
+             <div style={{ position: 'relative' }}>
+               <Mail size={16} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }} />
+               <input 
+                 type="email" 
+                 required
+                 value={email}
+                 onChange={e => setEmail(e.target.value)}
+                 placeholder="admin@hotel.com" 
+                 style={{ width: '100%', padding: '14px 16px 14px 44px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '14px', color: 'white', outline: 'none', transition: 'all 0.2s' }} 
+                 onFocus={e => e.target.style.borderColor = '#00CEC9'}
+                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+               />
+             </div>
+          </div>
 
-        <div className="keypad">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-            <button key={num} className="key" onClick={() => handlePush(num.toString())}>{num}</button>
-          ))}
-          <button className="key clear" onClick={handleClear}>C</button>
-          <button className="key" onClick={() => handlePush('0')}>0</button>
-          <button className="key login-btn" disabled={pin.length < 4 || loading} onClick={handleLogin}>
-            {loading ? <Loader2 className="animate-spin" /> : '➜'}
+          <div className="input-group" style={{ marginBottom: '8px' }}>
+             <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: '8px', textTransform: 'uppercase' }}>Secure Password</label>
+             <div style={{ position: 'relative' }}>
+               <Lock size={16} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }} />
+               <input 
+                 type="password" 
+                 required
+                 value={password}
+                 onChange={e => setPassword(e.target.value)}
+                 placeholder="••••••••" 
+                 style={{ width: '100%', padding: '14px 16px 14px 44px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '14px', color: 'white', outline: 'none', transition: 'all 0.2s', letterSpacing: '2px' }} 
+                 onFocus={e => e.target.style.borderColor = '#00CEC9'}
+                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+               />
+             </div>
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            style={{ width: '100%', padding: '16px', borderRadius: '12px', background: '#6C5CE7', color: 'white', fontSize: '15px', fontWeight: 700, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '16px', boxShadow: '0 8px 16px rgba(108, 92, 231, 0.3)', transition: 'all 0.2s' }}
+            onMouseOver={e => !loading && (e.target.style.transform = 'translateY(-2px)')}
+            onMouseOut={e => !loading && (e.target.style.transform = 'none')}
+          >
+            {loading ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={18} /> SECURE LOGIN</>}
           </button>
-        </div>
-
-        <div className="login-footer">
-          <HelpCircle size={14} /> Forgot PIN? Contact your administrator.
-        </div>
+        </form>
       </div>
-      <div style={{ position: 'fixed', bottom: '20px', color: '#31344B', fontSize: '10px', left: '50%', transform: 'translateX(-50%)' }}>
-        RestoGrow v1.0.0-Cloud | Multi-Tenant ID: {tenantId.substring(0, 8)}...
+      
+      <div style={{ position: 'fixed', bottom: '24px', color: 'rgba(255,255,255,0.3)', fontSize: '11px', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Lock size={12} /> RestoGrow Multi-Tenant Architecture | v1.2.0-Cloud
       </div>
     </div>
   );

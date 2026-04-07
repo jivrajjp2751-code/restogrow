@@ -46,19 +46,25 @@ export default function MasterPortal() {
 
       if (rError) throw rError;
 
-      // 2. Create Initial Admin User for that restaurant with PIN 1234
+      // 2. Create Initial Admin User for that restaurant
+      const email = `admin@${slug}.com`;
+      const password = 'admin123';
+      
       const { error: uError } = await supabase
         .from('users')
         .insert([{ 
           restaurant_id: rest.id, 
           name: 'Admin', 
-          pin: '1234', 
+          email: email,
+          password: password,
+          pin: '0000', // fallback to satisfy db constraint
           role: 'admin'
         }]);
 
       if (uError) throw uError;
 
       setShowAdd(false);
+      alert(`Client Deployed Successfully!\n\nEmail: ${email}\nPassword: ${password}`);
       fetchData();
     } catch (err) {
       alert('Error creating restaurant: ' + (err.message || 'Check database connection.'));
@@ -87,7 +93,7 @@ export default function MasterPortal() {
       {dbError && (
         <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '16px', borderRadius: '8px', marginBottom: '24px', fontWeight: 500, display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <span>⚠️ {dbError}</span>
-          <span style={{ fontSize: '13px' }}>If you are on Vercel, ensure you have added <b>VITE_SUPABASE_URL</b> and <b>VITE_SUPABASE_ANON_KEY</b> in your project settings -> Environment Variables. Then redeploy.</span>
+          <span style={{ fontSize: '13px' }}>If you are on Vercel, ensure you have added <b>VITE_SUPABASE_URL</b> and <b>VITE_SUPABASE_ANON_KEY</b> in your project settings -{'>'} Environment Variables. Then redeploy.</span>
         </div>
       )}
 
@@ -139,7 +145,7 @@ export default function MasterPortal() {
                       <td style={{ padding: '16px 24px' }}><span className="badge badge-success" style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', background: '#D1FAE5', color: '#065F46', fontWeight: 600 }}>{r.status.toUpperCase()}</span></td>
                       <td style={{ padding: '16px 24px', fontSize: '13px', color: '#64748B' }}>{new Date(r.createdAt || r.created_at || new Date()).toLocaleDateString()}</td>
                       <td style={{ textAlign: 'right', paddingRight: '24px' }}>
-                         <a href={`/#/login?rid=${r.id}`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', gap: '6px', display: 'inline-flex', alignItems: 'center', background: '#F1F5F9', color: '#334155', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, transition: 'all 0.2s' }}>
+                         <a href={`/#/login`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', gap: '6px', display: 'inline-flex', alignItems: 'center', background: '#F1F5F9', color: '#334155', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, transition: 'all 0.2s' }}>
                            LOGIN AS ADMIN <ExternalLink size={14} />
                          </a>
                       </td>
@@ -166,7 +172,7 @@ export default function MasterPortal() {
             <div className="form-group" style={{ marginBottom: '24px' }}>
                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>Restaurant Name</label>
                <input name="name" className="input" placeholder="e.g. Blue Lagoon Bar & Grill" required style={{ width: '100%', padding: '12px 16px', border: '1px solid #CBD5E1', borderRadius: '10px', fontSize: '15px', color: '#0F172A', outline: 'none', transition: 'border 0.2s' }} />
-               <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '8px' }}>An admin user with PIN '1234' will be automatically created.</p>
+               <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '8px' }}>A secure auto-generated admin User (admin@[hotel].com) will be automatically created.</p>
             </div>
             
             <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
