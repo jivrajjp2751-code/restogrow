@@ -78,7 +78,8 @@ export default function OrderPage() {
 
   const handleAddItem = async (menuItem) => {
     if (!order || busy) return;
-    if ((menuItem.stock ?? 0) <= 0) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
+    const isOOS = menuItem.stock !== undefined && menuItem.stock !== null && menuItem.stock <= 0;
+    if (isOOS) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
     setBusy(true);
     try {
       const cat = (categories || []).find(c => c.id === menuItem.categoryId);
@@ -209,7 +210,7 @@ export default function OrderPage() {
   }
 
   const renderItemCard = (item) => {
-    const isOOS = (item.stock ?? 0) <= 0;
+    const isOOS = item.stock !== undefined && item.stock !== null && item.stock <= 0;
     return (
       <div
         key={item.id}
@@ -225,7 +226,7 @@ export default function OrderPage() {
         {item.code && <div className="menu-item-code">{item.code}</div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '4px' }}>
           <div className="menu-item-price">{config.currency}{item.price}</div>
-          {(item.stock ?? 0) <= 5 && (item.stock ?? 0) > 0 && (
+          {item.stock !== undefined && item.stock !== null && item.stock <= 5 && item.stock > 0 && (
             <span style={{ fontSize: '9px', color: 'var(--brand-danger)', fontFamily: 'var(--font-mono)' }}>LOW:{item.stock}</span>
           )}
           {isOOS && <span className="badge badge-danger">OUT</span>}

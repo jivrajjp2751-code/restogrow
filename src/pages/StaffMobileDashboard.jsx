@@ -96,7 +96,8 @@ export default function StaffMobileDashboard() {
 
   const handleAddItem = async (menuItem) => {
     if (!order || busy) return;
-    if ((menuItem.stock ?? 0) <= 0) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
+    const isOOS = menuItem.stock !== undefined && menuItem.stock !== null && menuItem.stock <= 0;
+    if (isOOS) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
 
     setBusy(true);
     try {
@@ -352,7 +353,7 @@ export default function StaffMobileDashboard() {
 
       <div className="staff-menu-grid">
         {filteredItems.map(item => {
-          const isOOS = (item.stock ?? 0) <= 0;
+          const isOOS = item.stock !== undefined && item.stock !== null && item.stock <= 0;
           return (
             <div
               key={item.id}
