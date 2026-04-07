@@ -1439,7 +1439,7 @@ ul, ol { list-style: none; }
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-height: 60px;
+  min-height: 80px;
   cursor: pointer;
   transition: var(--transition-fast);
   position: relative;
@@ -1450,8 +1450,15 @@ ul, ol { list-style: none; }
   border-color: var(--brand-primary);
 }
 .staff-menu-card.oos {
-  opacity: 0.3;
+  opacity: 0.25;
   pointer-events: none;
+  filter: grayscale(1);
+}
+.staff-menu-card.processing {
+  opacity: 0.7;
+  pointer-events: none;
+  border-style: dashed;
+  border-color: var(--brand-primary-light);
 }
 
 .staff-menu-card-name {
@@ -1502,10 +1509,14 @@ ul, ol { list-style: none; }
   font-size: 10px;
   font-weight: 800;
   color: var(--brand-danger);
-  background: rgba(255,107,107,0.15);
-  padding: 2px 6px;
-  border-radius: 3px;
+  background: #FFF;
+  color: var(--brand-danger);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 2px solid var(--brand-danger);
   font-family: var(--font-mono);
+  box-shadow: 0 4px 12px rgba(255,59,48,0.3);
+  z-index: 5;
 }
 
 .staff-empty {

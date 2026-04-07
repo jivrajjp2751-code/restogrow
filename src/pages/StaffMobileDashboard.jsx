@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
+import { useSearchParams } from 'react-router-dom';
 import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
   updateTable, createOrder, generateBill,
@@ -14,7 +15,9 @@ export default function StaffMobileDashboard() {
   const { tables, sections, menuItems, categories, config, refresh, currentSession, logout, refreshing = false } = useApp();
   const { addToast } = useToast();
 
-  const [selectedTable, setSelectedTable] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedTableId = searchParams.get('tableId');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMenuTab, setActiveMenuTab] = useState('bar');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -26,20 +29,27 @@ export default function StaffMobileDashboard() {
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [discount, setDiscount] = useState(0);
   const [order, setOrder] = useState(null);
+  const [itemAdding, setItemAdding] = useState(false); // To prevent double clicks
+
+  const selectedTable = useMemo(() => 
+    tables.find(t => t.id === selectedTableId), 
+  [tables, selectedTableId]);
 
   // Load order for selected table
   const loadOrder = useCallback(async () => {
-    if (selectedTable) {
+    if (selectedTableId) {
       try {
-        const existingOrder = await getOrderForTable(selectedTable.id);
+        const existingOrder = await getOrderForTable(selectedTableId);
         setOrder(existingOrder);
       } catch { setOrder(null); }
     } else {
       setOrder(null);
     }
-  }, [selectedTable]);
+  }, [selectedTableId]);
 
-  useEffect(() => { loadOrder(); }, [loadOrder, tables]);
+  useEffect(() => { 
+    loadOrder(); 
+  }, [selectedTableId, tables, loadOrder]);
 
   const refreshOrder = useCallback(async () => {
     await loadOrder();
@@ -64,7 +74,7 @@ export default function StaffMobileDashboard() {
     if (table.status === 'available') {
       setCustomerModal(table);
     } else {
-      setSelectedTable(table);
+      setSearchParams({ tableId: table.id });
     }
   };
 
@@ -72,24 +82,48 @@ export default function StaffMobileDashboard() {
     if (!customerModal) return;
     const table = customerModal;
     try {
-      await createOrder(table.id, table.label || `T${table.number}`, customerName);
+      const newOrder = await createOrder(table.id, table.label || `T${table.number}`, customerName);
       refresh();
       addToast(`${table.label} — Order started`, 'success');
       setCustomerModal(null);
       setCustomerName('');
-      setSelectedTable(table);
+      setSearchParams({ tableId: table.id });
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
   };
 
   const handleAddItem = async (menuItem) => {
-    if (!order) return;
+    if (!order || itemAdding) return;
     if (menuItem.stock <= 0) { addToast(`${menuItem.name} — OUT OF STOCK`, 'error'); return; }
+    
+    setItemAdding(true);
+    // Optimistic UI update (optional but helps feel faster)
+    const tempItemId = 'temp-' + Date.now();
+    const optimisticItem = {
+      id: tempItemId,
+      orderId: order.id,
+      menuItemId: menuItem.id,
+      name: menuItem.name,
+      price: menuItem.price,
+      quantity: 1,
+      categoryType: categories.find(c => c.id === menuItem.categoryId)?.type || 'bar'
+    };
+    
+    setOrder(prev => ({
+      ...prev,
+      items: [...(prev?.items || []), optimisticItem]
+    }));
+
     try {
-      const cat = categories.find(c => c.id === menuItem.categoryId);
-      await addItemToOrder(order.id, { ...menuItem, categoryType: cat?.type || 'bar' });
+      await addItemToOrder(order.id, { ...menuItem, categoryType: optimisticItem.categoryType });
       await refreshOrder();
       addToast(`+ ${menuItem.name}`, 'success');
-    } catch (e) { addToast(e.message || 'Failed', 'error'); }
+    } catch (e) { 
+      addToast(e.message || 'Failed', 'error');
+      // Rollback on failure
+      loadOrder();
+    } finally {
+      setItemAdding(false);
+    }
   };
 
   const handleQtyChange = async (itemId, delta) => {
@@ -141,7 +175,7 @@ export default function StaffMobileDashboard() {
         refresh();
         addToast('✅ Bill generated & printed', 'success');
         setBillModal(false);
-        setSelectedTable(null);
+        setSearchParams({}); // Clear selection
       } else {
         addToast('Failed', 'error');
       }
@@ -158,7 +192,7 @@ export default function StaffMobileDashboard() {
   const kitchenOrderItems = (order?.items || []).filter(i => i.categoryType === 'kitchen');
 
   // ===== TABLE VIEW =====
-  if (!selectedTable) {
+  if (!selectedTableId) {
     return (
       <div className="staff-mobile">
         <div className="staff-mobile-header" style={{ position: 'sticky', top: 0, zIndex: 100 }}>
@@ -252,12 +286,12 @@ export default function StaffMobileDashboard() {
   return (
     <div className="staff-mobile">
       <div className="staff-order-header">
-        <button className="staff-back-btn" onClick={() => { setSelectedTable(null); setSearchQuery(''); setActiveCategory('all'); }}>
+        <button className="staff-back-btn" onClick={() => { setSearchParams({}); setSearchQuery(''); setActiveCategory('all'); }}>
           <ArrowLeft size={18} />
         </button>
         <div className="staff-order-table-info">
-          <div className="staff-order-table-name">{selectedTable.label}</div>
-          {selectedTable.customerName && <div className="staff-order-customer">{selectedTable.customerName}</div>}
+          <div className="staff-order-table-name">{selectedTable?.label}</div>
+          {selectedTable?.customerName && <div className="staff-order-customer">{selectedTable.customerName}</div>}
         </div>
         <button className="staff-kot-btn" onClick={handlePrintSplitKOT} disabled={!order || (order?.items || []).length === 0}>
           <Printer size={14} /> KOT
@@ -320,8 +354,11 @@ export default function StaffMobileDashboard() {
         {filteredItems.map(item => {
           const isOOS = item.stock <= 0;
           return (
-            <div key={item.id} className={`staff-menu-card ${isOOS ? 'oos' : ''}`}
-              onClick={() => !isOOS && handleAddItem(item)}>
+            <div 
+              key={item.id} 
+              className={`staff-menu-card ${isOOS ? 'oos' : ''} ${itemAdding ? 'processing' : ''}`}
+              onClick={() => !isOOS && !itemAdding && handleAddItem(item)}
+            >
               <div className="staff-menu-card-name">{item.name}</div>
               <div className="staff-menu-card-bottom">
                 <span className="staff-menu-card-price">{config.currency}{item.price}</span>
@@ -357,7 +394,7 @@ export default function StaffMobileDashboard() {
         </div>
       )}
 
-      {billModal && (
+      {billModal && selectedTable && (
         <div className="modal-backdrop" onClick={() => setBillModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '380px' }}>
             <div className="modal-header">
