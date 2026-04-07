@@ -4,7 +4,7 @@ import { getBills, getCategories, getSplitReport, getMonthBills, getMostSoldLiqu
 import { TrendingUp, Calendar, DollarSign, PieChart, Printer, Wine, Coffee, Award } from 'lucide-react';
 
 export default function ReportsPage() {
-  const { config, categories, bills, sessions } = useApp();
+  const { config, categories, bills, sessions, refreshing = false } = useApp();
   const [reportType, setReportType] = useState('daily'); // daily, monthly, session
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selectedSessionId, setSelectedSessionId] = useState('');
@@ -15,10 +15,10 @@ export default function ReportsPage() {
   let filteredBills = [];
   let reportLabel = '';
   if (reportType === 'daily') {
-    filteredBills = bills.filter(b => b.createdAt.startsWith(today));
+    filteredBills = (bills || []).filter(b => b.createdAt?.startsWith(today));
     reportLabel = `Today — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
   } else if (reportType === 'monthly') {
-    filteredBills = getMonthBills(selectedMonth, bills);
+    filteredBills = getMonthBills(selectedMonth, bills || []);
     const [y, m] = selectedMonth.split('-');
     reportLabel = `${new Date(Number(y), Number(m) - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}`;
   } else if (reportType === 'session' && selectedSessionId) {
@@ -28,9 +28,9 @@ export default function ReportsPage() {
   }
 
   // KPI Calculations
-  const totalRevenue = filteredBills.reduce((s, b) => s + b.total, 0);
+  const totalRevenue = filteredBills.reduce((s, b) => s + (b.total || 0), 0);
   const totalBills = filteredBills.length;
-  const totalItems = filteredBills.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.quantity, 0), 0);
+  const totalItems = filteredBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
   
   // Split Report: bar vs kitchen
   const splitReport = getSplitReport(filteredBills, categories);
@@ -51,12 +51,12 @@ export default function ReportsPage() {
   // Category Breakdown
   const categorySales = {};
   filteredBills.forEach(bill => {
-    bill.items.forEach(item => {
-      const cat = categories.find(c => c.id === item.categoryId);
+    (bill.items || []).forEach(item => {
+      const cat = (categories || []).find(c => c.id === item.categoryId);
       const catName = cat ? cat.name : 'Other';
       if (!categorySales[catName]) categorySales[catName] = { qty: 0, revenue: 0, color: cat?.color || '#999', type: cat?.type || 'bar' };
-      categorySales[catName].qty += item.quantity;
-      categorySales[catName].revenue += item.price * item.quantity;
+      categorySales[catName].qty += (item.quantity || 0);
+      categorySales[catName].revenue += (item.price || 0) * (item.quantity || 0);
     });
   });
   const categoryData = Object.entries(categorySales).sort((a,b) => b[1].revenue - a[1].revenue);

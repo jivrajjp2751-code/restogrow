@@ -11,7 +11,7 @@ import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, Wine, Coff
 export default function OrderPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
-  const { tables, menuItems, categories, config, refresh, currentUser } = useApp();
+  const { tables, menuItems, categories, config, refresh, currentUser, refreshing = false } = useApp();
   const { addToast } = useToast();
   const isAdmin = currentUser?.role === 'admin';
 
@@ -165,14 +165,14 @@ export default function OrderPage() {
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
   };
 
-  const subtotal = order?.items.reduce((s, i) => s + (i.price * i.quantity), 0) || 0;
-  const tax = (subtotal * config.taxRate) / 100;
-  const serviceCharge = (subtotal * config.serviceChargeRate) / 100;
+  const subtotal = (order?.items || []).reduce((s, i) => s + (i.price * i.quantity), 0) || 0;
+  const tax = (subtotal * (config.taxRate || 0)) / 100;
+  const serviceCharge = (subtotal * (config.serviceChargeRate || 0)) / 100;
   const total = subtotal + tax + serviceCharge;
 
   // Count items by type
-  const kitchenCount = order?.items.filter(i => i.categoryType === 'kitchen').length || 0;
-  const barCount = order?.items.filter(i => i.categoryType !== 'kitchen').length || 0;
+  const kitchenCount = (order?.items || []).filter(i => i.categoryType === 'kitchen').length;
+  const barCount = (order?.items || []).filter(i => i.categoryType !== 'kitchen').length;
 
   if (!table) {
     return (
@@ -327,11 +327,11 @@ export default function OrderPage() {
       <div className="order-panel">
         <div className="order-panel-header">
           <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '12px' }}>ORDER</span>
-          <span className="badge badge-info">{order?.items.length || 0} items</span>
+          <span className="badge badge-info">{(order?.items || []).length} items</span>
         </div>
 
         <div className="order-items-list">
-          {order?.items.length > 0 ? (
+          {(order?.items || []).length > 0 ? (
             order.items.map(item => (
               <div key={item.id} className="order-item">
                 <div className="order-item-info">
@@ -372,7 +372,7 @@ export default function OrderPage() {
           )}
         </div>
 
-        {order?.items.length > 0 && (
+        {(order?.items || []).length > 0 && (
           <>
             <div className="order-summary">
               <div className="order-summary-row">
@@ -458,7 +458,7 @@ export default function OrderPage() {
 
               {/* Items preview */}
               <div style={{ marginBottom: '12px', maxHeight: '150px', overflow: 'auto', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '8px' }}>
-                {order?.items.map(item => (
+                {(order?.items || []).map(item => (
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '11px' }}>
                     <span>{item.name} ×{item.quantity}</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{config.currency}{item.price * item.quantity}</span>

@@ -5,7 +5,7 @@ import { startSession, endSession, getCurrentSession, getSessionBills, getSplitR
 import { Play, Square, Clock, DollarSign, Printer, TrendingUp, BarChart3, Coffee, Wine, Calendar, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 
 export default function SessionPage() {
-  const { currentUser, currentSession, refresh, config, sessions: allSessions, categories, bills } = useApp();
+  const { currentUser, currentSession, refresh, config, sessions: allSessions, categories, bills, refreshing = false } = useApp();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -13,7 +13,7 @@ export default function SessionPage() {
   const [viewingSession, setViewingSession] = useState(null);
   const [expandedHistory, setExpandedHistory] = useState(false);
 
-  const pastSessions = allSessions.filter(s => s.status === 'ended').reverse();
+  const pastSessions = (allSessions || []).filter(s => s.status === 'ended').reverse();
   const displayedSessions = expandedHistory ? pastSessions : pastSessions.slice(0, 5);
 
   const handleStartSession = async () => {
@@ -51,9 +51,9 @@ export default function SessionPage() {
     const report = {
       session: { ...session },
       bills: sessionBills,
-      totalRevenue: sessionBills.reduce((s, b) => s + b.total, 0),
+      totalRevenue: sessionBills.reduce((s, b) => s + (b.total || 0), 0),
       totalBills: sessionBills.length,
-      totalItems: sessionBills.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.quantity, 0), 0),
+      totalItems: sessionBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0),
       paymentBreakdown: { Cash: 0, Card: 0, UPI: 0 },
       split: splitReport,
     };
@@ -287,8 +287,8 @@ export default function SessionPage() {
 
           <div className="past-sessions-list">
             {displayedSessions.map(session => {
-              const sessionBills = getSessionBills(session.id);
-              const revenue = sessionBills.reduce((s, b) => s + b.total, 0);
+              const sessionBills = getSessionBills(session.id, bills || []);
+              const revenue = sessionBills.reduce((s, b) => s + (b.total || 0), 0);
               return (
                 <div key={session.id} className="past-session-row" onClick={() => handleViewSession(session)}>
                   <div className="past-session-date">

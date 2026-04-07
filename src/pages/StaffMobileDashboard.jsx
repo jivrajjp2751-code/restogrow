@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export default function StaffMobileDashboard() {
-  const { tables, sections, menuItems, categories, config, refresh, currentSession, logout } = useApp();
+  const { tables, sections, menuItems, categories, config, refresh, currentSession, logout, refreshing = false } = useApp();
   const { addToast } = useToast();
 
   const [selectedTable, setSelectedTable] = useState(null);
@@ -148,14 +148,14 @@ export default function StaffMobileDashboard() {
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
   };
 
-  const subtotal = order?.items.reduce((s, i) => s + (i.price * i.quantity), 0) || 0;
+  const subtotal = (order?.items || []).reduce((s, i) => s + (i.price * i.quantity), 0) || 0;
   const tax = (subtotal * (config.taxRate || 0)) / 100;
   const serviceCharge = (subtotal * (config.serviceChargeRate || 0)) / 100;
   const discountAmt = (subtotal * discount) / 100;
   const total = subtotal + tax + serviceCharge - discountAmt;
 
-  const barOrderItems = order?.items.filter(i => i.categoryType !== 'kitchen') || [];
-  const kitchenOrderItems = order?.items.filter(i => i.categoryType === 'kitchen') || [];
+  const barOrderItems = (order?.items || []).filter(i => i.categoryType !== 'kitchen');
+  const kitchenOrderItems = (order?.items || []).filter(i => i.categoryType === 'kitchen');
 
   // ===== TABLE VIEW =====
   if (!selectedTable) {
@@ -259,18 +259,18 @@ export default function StaffMobileDashboard() {
           <div className="staff-order-table-name">{selectedTable.label}</div>
           {selectedTable.customerName && <div className="staff-order-customer">{selectedTable.customerName}</div>}
         </div>
-        <button className="staff-kot-btn" onClick={handlePrintSplitKOT} disabled={!order || order.items.length === 0}>
+        <button className="staff-kot-btn" onClick={handlePrintSplitKOT} disabled={!order || (order?.items || []).length === 0}>
           <Printer size={14} /> KOT
         </button>
-        <button className="staff-bill-btn" onClick={() => setBillModal(true)} disabled={!order || order.items.length === 0}>
+        <button className="staff-bill-btn" onClick={() => setBillModal(true)} disabled={!order || (order?.items || []).length === 0}>
           <Receipt size={14} /> BILL
         </button>
       </div>
 
-      {order && order.items.length > 0 && (
+      {order && (order?.items || []).length > 0 && (
         <div className="staff-order-items">
           <div className="staff-order-items-header">
-            <span>ORDER ({order.items.length})</span>
+            <span>ORDER ({(order?.items || []).length})</span>
             <span className="staff-order-total">{config.currency}{subtotal}</span>
           </div>
           <div className="staff-order-items-list">
@@ -366,7 +366,7 @@ export default function StaffMobileDashboard() {
             </div>
             <div className="modal-body">
               <div style={{ marginBottom: '12px', maxHeight: '200px', overflow: 'auto', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '8px' }}>
-                {order?.items.map(item => (
+                {(order?.items || []).map(item => (
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '11px' }}>
                     <span>{item.name} ×{item.quantity}</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{config.currency}{item.price * item.quantity}</span>

@@ -4,13 +4,13 @@ import { printBillDirect } from '../utils/print';
 import { Search, Printer, Receipt } from 'lucide-react';
 
 export default function BillingHistoryPage() {
-  const { config, bills: rawBills } = useApp();
-  const bills = [...rawBills].reverse();
+  const { bills: rawBills, config, refresh, refreshing = false } = useApp();
+  const bills = [...(rawBills || [])].reverse();
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
 
-  const filteredBills = bills.filter(b => {
-    const matchSearch = !searchQuery || b.billNumber.toLowerCase().includes(searchQuery.toLowerCase()) || String(b.tableNumber).includes(searchQuery);
+  const filteredBills = (bills || []).filter(b => {
+    const matchSearch = !searchQuery || b.billNumber?.toLowerCase().includes(searchQuery.toLowerCase()) || String(b.tableNumber || '').includes(searchQuery);
     const matchPayment = paymentFilter === 'all' || b.paymentMode === paymentFilter;
     return matchSearch && matchPayment;
   });
@@ -19,7 +19,7 @@ export default function BillingHistoryPage() {
     printBillDirect(bill);
   };
 
-  const todayTotal = bills.filter(b => b.createdAt.startsWith(new Date().toISOString().split('T')[0])).reduce((s, b) => s + b.total, 0);
+  const todayTotal = bills.filter(b => b.createdAt?.startsWith(new Date().toISOString().split('T')[0])).reduce((s, b) => s + (b.total || 0), 0);
 
   return (
     <div className="page-content">
@@ -55,7 +55,7 @@ export default function BillingHistoryPage() {
                   <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{bill.billNumber}</td>
                   <td style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{new Date(bill.createdAt).toLocaleString()}</td>
                   <td style={{ fontFamily: 'var(--font-mono)' }}>T{bill.tableNumber}</td>
-                  <td>{bill.items.length}</td>
+                  <td>{(bill.items || []).length}</td>
                   <td style={{ fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--brand-success)' }}>{config.currency}{bill.total}</td>
                   <td><span className="badge badge-info">{bill.paymentMode}</span></td>
                   <td><button className="btn btn-ghost btn-sm" onClick={() => handlePrint(bill)}><Printer size={12} /></button></td>

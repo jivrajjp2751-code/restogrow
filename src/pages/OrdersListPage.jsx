@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Clock, CheckCircle } from 'lucide-react';
 
 export default function OrdersListPage() {
-  const { orders, config } = useApp();
+  const { orders, config, refreshing = false } = useApp();
   const navigate = useNavigate();
 
-  const activeOrders = orders.filter(o => o.status === 'active');
-  const completedOrders = orders.filter(o => o.status === 'completed').reverse().slice(0, 30);
+  const activeOrders = (orders || []).filter(o => o.status === 'active');
+  const completedOrders = (orders || []).filter(o => o.status === 'completed').reverse().slice(0, 30);
 
   return (
     <div className="page-content">
@@ -27,7 +27,7 @@ export default function OrdersListPage() {
         {activeOrders.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
             {activeOrders.map(order => {
-              const subtotal = order.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+              const subtotal = (order.items || []).reduce((s, i) => s + ((i.price || 0) * (i.quantity || 0)), 0);
               return (
                 <div key={order.id} className="card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/order/${order.tableId}`)}>
                   <div className="card-body" style={{ padding: '10px' }}>
@@ -36,10 +36,10 @@ export default function OrdersListPage() {
                       <span className="badge badge-info">ACTIVE</span>
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                      {order.items.length} items · {config.currency}{subtotal}
+                      {(order.items || []).length} items · {config.currency}{subtotal}
                     </div>
                     <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                      {order.items.slice(0, 3).map(i => `${i.name}×${i.quantity}`).join(', ')}
+                      {(order.items || []).slice(0, 3).map(i => `${i.name}×${i.quantity}`).join(', ')}
                     </div>
                   </div>
                 </div>
@@ -64,7 +64,7 @@ export default function OrdersListPage() {
               {completedOrders.map(order => (
                 <tr key={order.id}>
                   <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>T{order.tableNumber}</td>
-                  <td>{order.items.length}</td>
+                  <td>{(order.items || []).length}</td>
                   <td>{order.customerName || '—'}</td>
                   <td style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{new Date(order.createdAt).toLocaleString()}</td>
                 </tr>

@@ -17,8 +17,8 @@ export function printBillDirect(bill) {
  */
 export function printSplitKOT(order, tableNumber, categories = []) {
   const getCatType = (item) => item.categoryType || 'bar';
-  const kitchenItems = order.items.filter(i => getCatType(i) === 'kitchen');
-  const barItems = order.items.filter(i => getCatType(i) !== 'kitchen');
+  const kitchenItems = (order?.items || []).filter(i => getCatType(i) === 'kitchen');
+  const barItems = (order?.items || []).filter(i => getCatType(i) !== 'kitchen');
 
   const result = { kitchenKOT: false, barKOT: false };
 
@@ -139,7 +139,7 @@ function buildKitchenKOTHTML(order, tableNumber) {
 
 <div class="dash"></div>
 
-${order.items.map(i => `
+${(order.items || []).map(i => `
 <div class="item-row">
   <div class="row"><span><b>${i.quantity}×</b> ${i.name}</span></div>
   ${i.note ? `<div class="note">→ ${i.note}</div>` : ''}
@@ -175,7 +175,7 @@ function buildBarKOTHTML(order, tableNumber) {
 
 <div class="dash"></div>
 
-${order.items.map(i => `
+${(order.items || []).map(i => `
 <div class="item-row">
   <div class="row"><span><b>${i.quantity}×</b> ${i.name}</span></div>
   ${i.note ? `<div class="note">→ ${i.note}</div>` : ''}
@@ -211,7 +211,7 @@ function buildKOTHTML(order, tableNumber) {
 
 <div class="dash"></div>
 
-${order.items.map(i => `
+${(order.items || []).map(i => `
 <div class="item-row">
   <div class="row"><span><b>${i.quantity}×</b> ${i.name}</span></div>
   ${i.note ? `<div class="note">→ ${i.note}</div>` : ''}
@@ -221,7 +221,7 @@ ${order.items.map(i => `
 <div class="dash"></div>
 
 <div class="center meta" style="margin-top:4px">
-  <p>Total Items: ${order.items.reduce((s, i) => s + i.quantity, 0)}</p>
+  <p>Total Items: ${(order.items || []).reduce((s, i) => s + (i.quantity || 0), 0)}</p>
   <p style="margin-top:6px">--- END KOT ---</p>
 </div>
 
@@ -275,7 +275,7 @@ ${bill.customerName ? `<div class="row sub"><span>Customer: ${bill.customerName}
 </div>
 <div style="border-top:1px solid #000;margin:2px 0"></div>
 
-${bill.items.map(i => `
+${(bill.items || []).map(i => `
 <div class="row">
   <span>${i.name} ×${i.quantity}</span>
   <span>₹${i.price * i.quantity}</span>

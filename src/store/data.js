@@ -1,5 +1,14 @@
 import { supabase } from '../utils/supabase';
 
+// Helper for UUID if crypto.randomUUID isn't available
+const getUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 let _restaurantId = null;
 
 // ===== MULTI-TENANT CONFIG =====
@@ -143,7 +152,7 @@ export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 export async function createOrder(tableId, tableLabel, customerName, createdBy) {
   // customerName is not in the orders table, skipping for now
   return dbInsert('orders', { 
-    id: crypto.randomUUID(), tableId: tableId, tableLabel, status: 'active', createdBy 
+    id: getUUID(), tableId: tableId, tableLabel, status: 'active', createdBy,
   });
 }
 
@@ -176,7 +185,7 @@ export async function generateBill(orderId, paymentMode, discount) {
   const discountAmount = (subtotal * (discount || 0)) / 100;
   const total = Math.round(subtotal + taxAmount + serviceCharge - discountAmount);
 
-  const billId = crypto.randomUUID();
+  const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
   
   const bill = await dbInsert('bills', {

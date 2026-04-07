@@ -8,10 +8,10 @@ import { CreditCard, Banknote, Smartphone, ArrowLeft, Printer } from 'lucide-rea
 export default function BillingPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { config, refresh, orders } = useApp();
+  const { config, refresh, orders, refreshing = false } = useApp();
   const { addToast } = useToast();
 
-  const order = orders.find(o => o.id === orderId);
+  const order = (orders || []).find(o => o.id === orderId);
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [discount, setDiscount] = useState(0);
   const [generatedBill, setGeneratedBill] = useState(null);
@@ -25,7 +25,7 @@ export default function BillingPage() {
     );
   }
 
-  const subtotal = order.items.reduce((s, i) => s + (i.price * i.quantity), 0);
+  const subtotal = (order?.items || []).reduce((s, i) => s + ((i.price || 0) * (i.quantity || 0)), 0);
   const taxAmount = (subtotal * config.taxRate) / 100;
   const serviceCharge = (subtotal * config.serviceChargeRate) / 100;
   const discountAmount = (subtotal * discount) / 100;
@@ -61,7 +61,7 @@ export default function BillingPage() {
               <span>{generatedBill.billNumber}</span><span>{generatedBill.tableNumber}</span>
             </div>
             <hr className="bill-divider" />
-            {generatedBill.items.map((item, i) => (
+            {(generatedBill.items || []).map((item, i) => (
               <div key={i} className="bill-item-row"><span>{item.name} ×{item.quantity}</span><span>₹{item.price * item.quantity}</span></div>
             ))}
             <hr className="bill-divider" />
@@ -104,7 +104,7 @@ export default function BillingPage() {
             <table className="data-table">
               <thead><tr><th>ITEM</th><th>QTY</th><th>AMT</th></tr></thead>
               <tbody>
-                {order.items.map(item => (
+                {(order?.items || []).map(item => (
                   <tr key={item.id}>
                     <td style={{ fontWeight: 600 }}>{item.name}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>{item.quantity}</td>
