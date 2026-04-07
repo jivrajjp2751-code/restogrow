@@ -39,21 +39,21 @@ export async function authenticateUser(email, password) {
 export async function syncAll() {
   if (!_restaurantId) return null;
   
-  const tables = ['tables', 'sections', 'categories', 'menu_items', 'users', 'orders', 'order_items', 'bills', 'bill_items', 'sessions', 'config'];
+  const tableNames = ['tables', 'sections', 'categories', 'menu_items', 'users', 'orders', 'order_items', 'bills', 'bill_items', 'sessions', 'config', 'inventory_log'];
   const results = {};
 
   try {
-    const fetchPromises = tables.map(table => 
+    const fetchPromises = tableNames.map(table => 
       supabase.from(table).select('*').eq('restaurant_id', _restaurantId)
     );
     
     const responses = await Promise.all(fetchPromises);
     
     responses.forEach((res, index) => {
-      const tableName = tables[index];
+      const tableName = tableNames[index];
       if (res.error) {
         console.error(`Error fetching ${tableName}:`, res.error);
-        return; // Don't add this key to results, preservings old data in AppContext
+        return;
       }
       
       if (!res.data) return;
@@ -69,11 +69,12 @@ export async function syncAll() {
       }
     });
 
-
     // Attach items to orders for UI convenience
     (results.orders || []).forEach(o => {
       o.items = (results.order_items || []).filter(item => item.orderId === o.id);
     });
+    
+    // Attach items to bills for reports
     (results.bills || []).forEach(b => {
       b.items = (results.bill_items || []).filter(item => item.billId === b.id);
     });
@@ -87,12 +88,16 @@ export async function syncAll() {
 
 // ===== GENERIC HELPERS =====
 async function dbInsert(table, data) {
+  const payload = { ...data, restaurant_id: _restaurantId };
   const { data: result, error } = await supabase
     .from(table)
-    .insert([{ ...data, restaurant_id: _restaurantId }])
+    .insert([payload])
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    console.error(`dbInsert ${table} FAILED:`, error.message, 'payload keys:', Object.keys(payload));
+    throw error;
+  }
   return result;
 }
 
@@ -150,7 +155,6 @@ export async function updateMenuItem(id, data) {
 export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
 export async function createOrder(tableId, tableLabel, customerName, createdBy) {
-  // customerName is not in the orders table, skipping for now
   const orderId = getUUID();
   const order = await dbInsert('orders', { 
     id: orderId, tableId: tableId, tableLabel, status: 'active', createdBy,
@@ -160,12 +164,10 @@ export async function createOrder(tableId, tableLabel, customerName, createdBy) 
 }
 
 export async function cancelOrder(orderId, tableId) {
-  // Update the specific order
   if (orderId) {
     await dbUpdate('orders', orderId, { status: 'cancelled' });
   }
   
-  // Also clean up any other dangling active orders for this table just in case crashes duplicated them
   if (tableId && _restaurantId) {
     await supabase.from('orders')
       .update({ status: 'cancelled' })
@@ -178,13 +180,15 @@ export async function cancelOrder(orderId, tableId) {
 }
 
 export async function addItemToOrder(orderId, menuItem) {
+  // Only send columns that exist in the order_items table
   return dbInsert('order_items', {
-    orderId: orderId, 
-    menuItemId: menuItem.id, 
-    name: menuItem.name, 
-    price: menuItem.price, 
-    quantity: 1, 
-    categoryType: menuItem.categoryType || 'bar'
+    orderId: orderId,
+    menuItemId: menuItem.id,
+    name: menuItem.name,
+    price: menuItem.price,
+    quantity: 1,
+    categoryType: menuItem.categoryType || 'bar',
+    categoryId: menuItem.categoryId
   });
 }
 
@@ -206,34 +210,52 @@ export async function generateBill(orderId, paymentMode, discount) {
   const discountAmount = (subtotal * (discount || 0)) / 100;
   const total = Math.round(subtotal + taxAmount + serviceCharge - discountAmount);
 
+  // Get active session
+  const { data: activeSession } = await supabase.from('sessions')
+    .select('id')
+    .eq('restaurant_id', _restaurantId)
+    .eq('status', 'active')
+    .maybeSingle();
+
   const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
   
+  // Only send columns that exist in the bills table
   const bill = await dbInsert('bills', {
     id: billId,
     orderId: orderId,
     billNumber,
     total,
-    paymentMode
+    paymentMode,
+    sessionId: activeSession ? activeSession.id : null,
+    createdAt: new Date().toISOString()
   });
 
+  // Only send columns that exist in the bill_items table
   const billItems = items.map(item => ({
     billId,
     name: item.name,
     price: item.price,
     quantity: item.quantity,
-    categoryType: item.categoryType,
+    categoryType: item.categoryType || 'bar',
+    categoryId: item.categoryId,
     restaurant_id: _restaurantId
   }));
-  await supabase.from('bill_items').insert(billItems);
+  
+  const { error: biErr } = await supabase.from('bill_items').insert(billItems);
+  if (biErr) console.error('bill_items insert failed:', biErr.message);
 
   await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
   await supabase.from('tables').update({ status: 'available' }).eq('id', order.tableId);
 
+  // Deduct stock
   for (const item of items) {
-    const { data: menuI } = await supabase.from('menu_items').select('stock').eq('id', item.menuItemId).single();
+    const mid = item.menuItemId;
+    if (!mid) continue;
+    const { data: menuI } = await supabase.from('menu_items').select('stock').eq('id', mid).single();
     if (menuI) {
-      await supabase.from('menu_items').update({ stock: Math.max(0, menuI.stock - item.quantity) }).eq('id', item.menuItemId);
+      const newStock = Math.max(0, menuI.stock - item.quantity);
+      await supabase.from('menu_items').update({ stock: newStock }).eq('id', mid);
     }
   }
 
@@ -241,7 +263,11 @@ export async function generateBill(orderId, paymentMode, discount) {
     bill: { 
       ...bill, 
       items, 
+      subtotal,
+      taxAmount,
+      taxRate: cfg.taxRate,
       discount,
+      discountAmount,
       tableNumber: order.tableLabel,
       restaurantName: cfg.restaurantName,
       currency: cfg.currency
@@ -291,13 +317,36 @@ export async function addInventoryLog(data) {
 }
 
 export async function addStock(menuItemId, qty, reason) {
-  const { data: item } = await supabase.from('menu_items').select('*').eq('id', menuItemId).single();
-  const newStock = (item?.stock || 0) + parseInt(qty);
-  await dbUpdate('menu_items', menuItemId, { stock: newStock });
-  return dbInsert('inventory_log', {
-    menuItemId, itemName: item?.name, changeQty: qty,
-    newStock, type: 'add', reason: reason || 'Manual restock'
-  });
+  // Step 1: Get item info
+  const { data: item, error: itmErr } = await supabase
+    .from('menu_items').select('*').eq('id', menuItemId).single();
+  if (itmErr || !item) throw new Error('Menu item not found: ' + (itmErr?.message || 'unknown'));
+
+  // Step 2: Update stock (this is the critical part - must succeed)
+  const newStock = (item.stock || 0) + Number(qty);
+  const { error: updErr } = await supabase
+    .from('menu_items')
+    .update({ stock: newStock })
+    .eq('id', menuItemId)
+    .eq('restaurant_id', _restaurantId);
+  
+  if (updErr) throw new Error('Stock update failed: ' + updErr.message);
+
+  // Step 3: Log the stock change (non-critical - wrapped in try/catch)
+  try {
+    await dbInsert('inventory_log', {
+      menuItemId,
+      itemName: item.name,
+      changeQty: Number(qty),
+      newStock,
+      type: 'add',
+      reason: reason || 'Manual restock'
+    });
+  } catch (logErr) {
+    console.warn('Inventory log failed (non-critical):', logErr.message);
+  }
+
+  return { status: 'success', newStock };
 }
 
 export async function startSession(startedBy) {
@@ -325,17 +374,19 @@ export function subscribeToChanges(callback) {
     .subscribe();
 }
 
-// ===== COMPUTED HELPERS (Same as before) =====
+// ===== COMPUTED HELPERS =====
 export function getSplitReport(bills, categories) {
   if (!bills || !categories) return { bar: [], kitchen: [], barTotal: 0, kitchenTotal: 0, barQty: 0, kitchenQty: 0 };
   const allItems = [];
   bills.forEach(bill => (bill.items || []).forEach(item => {
+    const qty = item.quantity || 0;
+    const price = item.price || 0;
     const existing = allItems.find(i => i.name === item.name);
     if (existing) {
-       existing.qty += item.quantity;
-       existing.revenue += item.price * item.quantity;
+       existing.qty += qty;
+       existing.revenue += price * qty;
     } else {
-       allItems.push({ ...item, qty: item.quantity, revenue: item.price * item.quantity });
+       allItems.push({ ...item, qty, revenue: price * qty });
     }
   }));
   const bar = allItems.filter(i => i.categoryType !== 'kitchen').sort((a,b) => b.qty - a.qty);
@@ -349,12 +400,35 @@ export function getSplitReport(bills, categories) {
   };
 }
 
-export function getSessionBills(sessionId, bills) {
-  return (bills || []).filter(b => b.sessionId === sessionId);
+export function getSessionBills(session, bills) {
+  if (!session || !bills) return [];
+  
+  const sessionId = session.id;
+  // Get session date for fallback matching (bills created before sessionId fix)
+  const sDate = (session.startedAt || '').substring(0, 10);
+  
+  return bills.filter(b => {
+    // Primary: match by sessionId
+    if (b.sessionId && b.sessionId === sessionId) return true;
+    
+    // Fallback: if bill has no sessionId, match by date
+    const bDate = (b.createdAt || b.created_at || '').substring(0, 10);
+    if (!b.sessionId && bDate && sDate && bDate === sDate) return true;
+    
+    return false;
+  });
 }
 
 // Client-side computed helpers
-export function getInventoryLog(logs) { return logs || []; }
+export function getInventoryLog(logs) { 
+  return (logs || []).map(l => ({
+    ...l,
+    itemName: l.itemName || l.item_name,
+    quantity: l.quantity || l.changeQty || l.change_qty,
+    remainingStock: l.remainingStock || l.newStock || l.new_stock,
+    timestamp: l.timestamp || l.created_at
+  }));
+}
 export function getLowStockItems(items) { return (items || []).filter(i => (i.stock || 0) <= 10); }
 export function getBills(bills) { return bills || []; }
 export function getCategories(categories) { return categories || []; }
@@ -362,12 +436,18 @@ export function getSessions(sessions) { return sessions || []; }
 
 export function getMonthBills(month, bills) {
   if (!bills) return [];
-  return bills.filter(b => b.createdAt?.startsWith(month));
+  return bills.filter(b => {
+    const d = b.createdAt || b.created_at;
+    return d?.startsWith(month);
+  });
 }
 
 export function getMostSoldLiquor(month, bills, categories) {
   if (!bills || !categories) return [];
-  const monthBills = bills.filter(b => b.createdAt?.startsWith(month));
+  const monthBills = bills.filter(b => {
+    const d = b.createdAt || b.created_at;
+    return d?.startsWith(month);
+  });
   const itemMap = {};
   monthBills.forEach(bill => {
     (bill.items || []).forEach(item => {

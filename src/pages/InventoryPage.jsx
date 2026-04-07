@@ -46,7 +46,7 @@ export default function InventoryPage() {
       addToast(`+${addQty} ${stockModal.unit} → ${stockModal.name}`, 'success');
       setStockModal(null);
       setAddQty('');
-    } catch (e) { addToast('Failed', 'error'); }
+    } catch (e) { addToast('Failed: ' + e.message, 'error'); }
   };
 
   const openAddItem = (type) => {

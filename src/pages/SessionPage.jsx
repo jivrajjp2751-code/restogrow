@@ -26,7 +26,7 @@ export default function SessionPage() {
 
   const handleEndSession = async () => {
     if (!currentSession) return;
-    const sessionBills = getSessionBills(currentSession.id, bills);
+    const sessionBills = getSessionBills(currentSession, bills);
     const splitReport = getSplitReport(sessionBills, categories);
 
     const report = buildReportData(currentSession, sessionBills, splitReport);
@@ -37,11 +37,11 @@ export default function SessionPage() {
       setEndReport(report);
       setShowEndConfirm(false);
       addToast('Session ended. Daily report ready.', 'success');
-    } catch (e) { addToast('Failed: ' + e.message, 'error'); }
+    } catch (e) { addToast('Failed to end session: ' + (e.message || e), 'error'); }
   };
 
   const handleViewSession = (session) => {
-    const sessionBills = getSessionBills(session.id, bills);
+    const sessionBills = getSessionBills(session, bills);
     const splitReport = getSplitReport(sessionBills, categories);
     const report = buildReportData(session, sessionBills, splitReport);
     setViewingSession(report);
@@ -53,7 +53,7 @@ export default function SessionPage() {
       bills: sessionBills,
       totalRevenue: sessionBills.reduce((s, b) => s + (b.total || 0), 0),
       totalBills: sessionBills.length,
-      totalItems: sessionBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0),
+      totalItems: sessionBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || i.qty || 0), 0), 0),
       paymentBreakdown: { Cash: 0, Card: 0, UPI: 0 },
       split: splitReport,
     };
@@ -287,7 +287,7 @@ export default function SessionPage() {
 
           <div className="past-sessions-list">
             {displayedSessions.map(session => {
-              const sessionBills = getSessionBills(session.id, bills || []);
+              const sessionBills = getSessionBills(session, bills || []);
               const revenue = sessionBills.reduce((s, b) => s + (b.total || 0), 0);
               return (
                 <div key={session.id} className="past-session-row" onClick={() => handleViewSession(session)}>

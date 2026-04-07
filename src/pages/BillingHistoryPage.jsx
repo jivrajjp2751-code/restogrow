@@ -19,7 +19,10 @@ export default function BillingHistoryPage() {
     printBillDirect(bill);
   };
 
-  const todayTotal = bills.filter(b => b.createdAt?.startsWith(new Date().toISOString().split('T')[0])).reduce((s, b) => s + (b.total || 0), 0);
+  const todayTotal = bills.filter(b => {
+    const d = b.createdAt || b.created_at;
+    return d?.startsWith(new Date().toISOString().split('T')[0]);
+  }).reduce((s, b) => s + (b.total || 0), 0);
 
   return (
     <div className="page-content">
@@ -53,7 +56,7 @@ export default function BillingHistoryPage() {
               {filteredBills.map(bill => (
                 <tr key={bill.id}>
                   <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{bill.billNumber}</td>
-                  <td style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{new Date(bill.createdAt).toLocaleString()}</td>
+                  <td style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{new Date(bill.createdAt || bill.created_at).toLocaleString()}</td>
                   <td style={{ fontFamily: 'var(--font-mono)' }}>T{bill.tableNumber}</td>
                   <td>{(bill.items || []).length}</td>
                   <td style={{ fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--brand-success)' }}>{config.currency}{bill.total}</td>

@@ -262,8 +262,8 @@ function buildBillHTML(bill) {
   <span>T${bill.tableNumber}</span>
 </div>
 <div class="row sub">
-  <span>${new Date(bill.createdAt).toLocaleDateString()}</span>
-  <span>${new Date(bill.createdAt).toLocaleTimeString()}</span>
+  <span>${new Date(bill.createdAt || bill.created_at).toLocaleDateString()}</span>
+  <span>${new Date(bill.createdAt || bill.created_at).toLocaleTimeString()}</span>
 </div>
 ${bill.customerName ? `<div class="row sub"><span>Customer: ${bill.customerName}</span></div>` : ''}
 

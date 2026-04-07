@@ -66,7 +66,7 @@ export default function OrdersListPage() {
                   <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>T{order.tableNumber}</td>
                   <td>{(order.items || []).length}</td>
                   <td>{order.customerName || '—'}</td>
-                  <td style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{new Date(order.createdAt).toLocaleString()}</td>
+                  <td style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{new Date(order.createdAt || order.created_at).toLocaleString()}</td>
                 </tr>
               ))}
               {completedOrders.length === 0 && (

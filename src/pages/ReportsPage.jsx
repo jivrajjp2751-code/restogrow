@@ -15,15 +15,18 @@ export default function ReportsPage() {
   let filteredBills = [];
   let reportLabel = '';
   if (reportType === 'daily') {
-    filteredBills = (bills || []).filter(b => b.createdAt?.startsWith(today));
+    filteredBills = (bills || []).filter(b => {
+      const d = b.createdAt || b.created_at;
+      return d?.startsWith(today);
+    });
     reportLabel = `Today — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
   } else if (reportType === 'monthly') {
     filteredBills = getMonthBills(selectedMonth, bills || []);
     const [y, m] = selectedMonth.split('-');
     reportLabel = `${new Date(Number(y), Number(m) - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}`;
   } else if (reportType === 'session' && selectedSessionId) {
-    filteredBills = getSessionBills(selectedSessionId, bills);
     const s = sessions.find(se => se.id === selectedSessionId);
+    filteredBills = getSessionBills(s, bills);
     reportLabel = s ? `Session: ${s.date} (${s.startedBy})` : '';
   }
 
@@ -52,7 +55,7 @@ export default function ReportsPage() {
   const categorySales = {};
   filteredBills.forEach(bill => {
     (bill.items || []).forEach(item => {
-      const cat = (categories || []).find(c => c.id === item.categoryId);
+      const cat = (categories || []).find(c => c.id === (item.categoryId || item.category_id));
       const catName = cat ? cat.name : 'Other';
       if (!categorySales[catName]) categorySales[catName] = { qty: 0, revenue: 0, color: cat?.color || '#999', type: cat?.type || 'bar' };
       categorySales[catName].qty += (item.quantity || 0);
