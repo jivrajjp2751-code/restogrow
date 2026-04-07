@@ -95,7 +95,8 @@ export default function StaffMobileDashboard() {
   };
 
   const handleAddItem = async (menuItem) => {
-    if (!order || busy) return;
+    if (!order) { addToast("Order not initialized yet", "warning"); return; }
+    if (busy) return;
     // Removed strict stock check to allow adding items when inventory isn't explicitly tracked
 
     setBusy(true);

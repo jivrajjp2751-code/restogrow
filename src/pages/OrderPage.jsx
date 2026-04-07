@@ -77,7 +77,8 @@ export default function OrderPage() {
   }, [menuItems, kitchenCategory, searchQuery, kitchenCatIds]);
 
   const handleAddItem = async (menuItem) => {
-    if (!order || busy) return;
+    if (!order) { addToast("Order not initialized yet", "warning"); return; }
+    if (busy) return;
     setBusy(true);
     try {
       const cat = (categories || []).find(c => c.id === menuItem.categoryId);

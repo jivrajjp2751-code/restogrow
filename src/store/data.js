@@ -155,13 +155,13 @@ export async function createOrder(tableId, tableLabel, customerName, createdBy) 
   const order = await dbInsert('orders', { 
     id: orderId, tableId: tableId, tableLabel, status: 'active', createdBy,
   });
-  await dbUpdate('tables', tableId, { status: 'occupied', customerName });
+  await dbUpdate('tables', tableId, { status: 'occupied' });
   return order;
 }
 
 export async function cancelOrder(orderId, tableId) {
   await dbUpdate('orders', orderId, { status: 'cancelled' });
-  await dbUpdate('tables', tableId, { status: 'available', customerName: '' });
+  await dbUpdate('tables', tableId, { status: 'available' });
 }
 
 export async function addItemToOrder(orderId, menuItem) {
