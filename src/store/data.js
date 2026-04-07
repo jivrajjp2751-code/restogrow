@@ -71,12 +71,12 @@ export async function syncAll() {
 
     // Attach items to orders for UI convenience
     (results.orders || []).forEach(o => {
-      o.items = (results.order_items || []).filter(item => item.orderId === o.id);
+      o.items = (results.order_items || []).filter(item => (item.orderId || item.order_id) === o.id);
     });
     
     // Attach items to bills for reports
     (results.bills || []).forEach(b => {
-      b.items = (results.bill_items || []).filter(item => item.billId === b.id);
+      b.items = (results.bill_items || []).filter(item => (item.billId || item.bill_id) === b.id);
     });
 
     return results;
