@@ -187,8 +187,7 @@ export async function addItemToOrder(orderId, menuItem) {
     name: menuItem.name,
     price: menuItem.price,
     quantity: 1,
-    categoryType: menuItem.categoryType || 'bar',
-    categoryId: menuItem.categoryId
+    categoryType: menuItem.categoryType || 'bar'
   });
 }
 
@@ -238,7 +237,6 @@ export async function generateBill(orderId, paymentMode, discount) {
     price: item.price,
     quantity: item.quantity,
     categoryType: item.categoryType || 'bar',
-    categoryId: item.categoryId,
     restaurant_id: _restaurantId
   }));
   
