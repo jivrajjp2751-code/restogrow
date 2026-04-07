@@ -92,10 +92,13 @@ async function dbDelete(table, id) {
 
 // ===== EXPORTED ACTIONS =====
 export async function addTable(data) { 
-  const { number, label, seats, sectionId } = data;
-  return dbInsert('tables', { number, label, seats, sectionId }); 
+  const { number, label, sectionId } = data;
+  return dbInsert('tables', { number, label, sectionId: sectionId }); 
 }
-export async function updateTable(id, data) { return dbUpdate('tables', id, data); }
+export async function updateTable(id, data) {
+  const { number, label, sectionId, status } = data;
+  return dbUpdate('tables', id, { number, label, sectionId: sectionId, status });
+}
 export async function deleteTable(id) { return dbDelete('tables', id); }
 
 export async function addSection(data) { return dbInsert('sections', data); }
@@ -114,23 +117,24 @@ export async function deleteCategory(id) { return dbDelete('categories', id); }
 
 export async function addMenuItem(data) { 
   const { name, code, price, stock, categoryId } = data;
-  return dbInsert('menu_items', { name, code, price, stock, categoryId }); 
+  return dbInsert('menu_items', { name, code, price, stock, categoryId: categoryId }); 
 }
 export async function updateMenuItem(id, data) { 
   const { name, code, price, stock, categoryId } = data;
-  return dbUpdate('menu_items', id, { name, code, price, stock, categoryId }); 
+  return dbUpdate('menu_items', id, { name, code, price, stock, categoryId: categoryId }); 
 }
 export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
 export async function createOrder(tableId, tableLabel, customerName, createdBy) {
+  // customerName is not in the orders table, skipping for now
   return dbInsert('orders', { 
-    id: crypto.randomUUID(), tableId, tableLabel, status: 'active', createdBy 
+    id: crypto.randomUUID(), tableId: tableId, tableLabel, status: 'active', createdBy 
   });
 }
 
 export async function addItemToOrder(orderId, menuItem) {
   return dbInsert('order_items', {
-    orderId, 
+    orderId: orderId, 
     menuItemId: menuItem.id, 
     name: menuItem.name, 
     price: menuItem.price, 
@@ -140,26 +144,76 @@ export async function addItemToOrder(orderId, menuItem) {
 }
 
 export async function generateBill(orderId, paymentMode, discount) {
-  // Complex bill logic moved to CloudDB...
+  // 1. Get Order & Items
+  const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).single();
+  if (orderErr) throw orderErr;
+  
+  const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('orderId', orderId);
+  if (itemsErr) throw itemsErr;
+
+  const { data: configData } = await supabase.from('config').select('*').eq('restaurant_id', _restaurantId);
+  const cfg = { taxRate: 0, serviceChargeRate: 0, restaurantName: 'RestoGrow', currency: '₹' };
+  configData?.forEach(r => { cfg[r.id] = r.value; });
+
+  const subtotal = items.reduce((s, i) => s + (i.price * i.quantity), 0);
+  const taxAmount = (subtotal * (cfg.taxRate || 0)) / 100;
+  const serviceCharge = (subtotal * (cfg.serviceChargeRate || 0)) / 100;
+  const discountAmount = (subtotal * (discount || 0)) / 100;
+  const total = Math.round(subtotal + taxAmount + serviceCharge - discountAmount);
+
+  const billId = crypto.randomUUID();
+  const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
+  
+  const bill = await dbInsert('bills', {
+    id: billId,
+    orderId: orderId,
+    billNumber,
+    customerName: '', // Order table doesn't have it, so leaving empty for now
+    total,
+    paymentMode,
+    subtotal,
+    taxRate: cfg.taxRate,
+    taxAmount,
+    discount,
+    discountAmount
+  });
+
+  const billItems = items.map(item => ({
+    billId,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+    categoryType: item.categoryType,
+    restaurant_id: _restaurantId
+  }));
+  await supabase.from('bill_items').insert(billItems);
+
+  await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
+  await supabase.from('tables').update({ status: 'available' }).eq('id', order.tableId);
+
+  for (const item of items) {
+    const { data: menuI } = await supabase.from('menu_items').select('stock').eq('id', item.menuItemId).single();
+    if (menuI) {
+      await supabase.from('menu_items').update({ stock: Math.max(0, menuI.stock - item.quantity) }).eq('id', item.menuItemId);
+    }
+  }
+
+  return { 
+    bill: { 
+      ...bill, 
+      items, 
+      tableNumber: order.tableLabel,
+      restaurantName: cfg.restaurantName,
+      currency: cfg.currency
+    } 
+  };
 }
 
 export async function getOrderForTable(tableId) {
   if (!_restaurantId) return null;
-  const { data: order } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('restaurant_id', _restaurantId)
-    .eq('tableId', tableId)
-    .eq('status', 'active')
-    .maybeSingle();
-    
+  const { data: order } = await supabase.from('orders').select('*').eq('restaurant_id', _restaurantId).eq('tableId', tableId).eq('status', 'active').maybeSingle();
   if (!order) return null;
-
-  const { data: items } = await supabase
-    .from('order_items')
-    .select('*')
-    .eq('orderId', order.id);
-
+  const { data: items } = await supabase.from('order_items').select('*').eq('orderId', order.id);
   order.items = items || [];
   return order;
 }

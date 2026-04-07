@@ -72,7 +72,7 @@ export default function TablesPage() {
       addToast(`Table ${newTableForm.label} added`, 'success');
       setAddTableModal(null);
       setNewTableForm({ label: '', seats: 4 });
-    } catch (e) { addToast('Failed', 'error'); }
+    } catch (e) { addToast(e.message || 'Failed', 'error'); }
   };
 
   const handleDeleteTable = async (tableId) => {
@@ -80,7 +80,7 @@ export default function TablesPage() {
     if (table?.status === 'occupied') { addToast('Cannot delete occupied table', 'error'); return; }
     if (confirm('Delete this table?')) {
       try { await deleteTable(tableId); refresh(); addToast('Table removed', 'info'); }
-      catch (e) { addToast('Failed', 'error'); }
+      catch (e) { addToast(e.message || 'Failed', 'error'); }
     }
   };
 
@@ -92,7 +92,7 @@ export default function TablesPage() {
       addToast(`Section "${sectionForm.name}" added`, 'success');
       setSectionModal(null);
       setSectionForm({ name: '', icon: '🏠', color: '#00B894' });
-    } catch (e) { addToast('Failed', 'error'); }
+    } catch (e) { addToast(e.message || 'Failed', 'error'); }
   };
 
   const handleEditSection = (section) => {
@@ -110,7 +110,7 @@ export default function TablesPage() {
         refresh();
         addToast('Section updated', 'success');
         setSectionModal(null);
-      } catch (e) { addToast('Failed', 'error'); }
+      } catch (e) { addToast(e.message || 'Failed', 'error'); }
     }
   };
 
