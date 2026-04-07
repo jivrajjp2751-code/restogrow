@@ -89,7 +89,7 @@ export default function StaffMobileDashboard() {
       await addItemToOrder(order.id, { ...menuItem, categoryType: cat?.type || 'bar' });
       await refreshOrder();
       addToast(`+ ${menuItem.name}`, 'success');
-    } catch (e) { addToast('Failed', 'error'); }
+    } catch (e) { addToast(e.message || 'Failed', 'error'); }
   };
 
   const handleQtyChange = async (itemId, delta) => {
@@ -101,7 +101,7 @@ export default function StaffMobileDashboard() {
         if (newQty <= 0) await removeOrderItem(order.id, itemId);
         else await updateOrderItem(order.id, itemId, { quantity: newQty });
         await refreshOrder();
-      } catch (e) { addToast('Failed', 'error'); }
+      } catch (e) { addToast(e.message || 'Failed', 'error'); }
     }
   };
 
@@ -110,7 +110,7 @@ export default function StaffMobileDashboard() {
     try {
       await removeOrderItem(order.id, itemId);
       await refreshOrder();
-    } catch (e) { addToast('Failed', 'error'); }
+    } catch (e) { addToast(e.message || 'Failed', 'error'); }
   };
 
   const handleAddNote = async () => {
@@ -120,7 +120,7 @@ export default function StaffMobileDashboard() {
       await refreshOrder();
       setNoteModal(null);
       setNoteText('');
-    } catch (e) { addToast('Failed', 'error'); }
+    } catch (e) { addToast(e.message || 'Failed', 'error'); }
   };
 
   const handlePrintSplitKOT = () => {

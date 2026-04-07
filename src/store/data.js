@@ -91,7 +91,10 @@ async function dbDelete(table, id) {
 }
 
 // ===== EXPORTED ACTIONS =====
-export async function addTable(data) { return dbInsert('tables', data); }
+export async function addTable(data) { 
+  const { number, label, seats, sectionId } = data;
+  return dbInsert('tables', { number, label, seats, sectionId }); 
+}
 export async function updateTable(id, data) { return dbUpdate('tables', id, data); }
 export async function deleteTable(id) { return dbDelete('tables', id); }
 
@@ -127,8 +130,12 @@ export async function createOrder(tableId, tableLabel, customerName, createdBy) 
 
 export async function addItemToOrder(orderId, menuItem) {
   return dbInsert('order_items', {
-    orderId, menuItemId: menuItem.id, name: menuItem.name, 
-    price: menuItem.price, quantity: 1, categoryType: menuItem.categoryType || 'bar'
+    orderId, 
+    menuItemId: menuItem.id, 
+    name: menuItem.name, 
+    price: menuItem.price, 
+    quantity: 1, 
+    categoryType: menuItem.categoryType || 'bar'
   });
 }
 

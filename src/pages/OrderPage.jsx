@@ -80,7 +80,7 @@ export default function OrderPage() {
       await addItemToOrder(order.id, { ...menuItem, categoryType: cat?.type || 'bar' });
       await refreshOrder();
       addToast(`+ ${menuItem.name}`, 'success');
-    } catch (e) { addToast('Failed', 'error'); }
+    } catch (e) { addToast(e.message || 'Failed', 'error'); console.error('Add Item Error:', e); }
   };
 
   const handleQtyChange = async (itemId, delta) => {
