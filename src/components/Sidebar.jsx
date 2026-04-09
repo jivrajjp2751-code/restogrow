@@ -17,7 +17,7 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const { currentUser, logout, theme, toggleTheme, currentSession } = useApp();
+  const { currentUser, logout, currentSession } = useApp();
   const isAdmin = currentUser?.role === 'admin';
 
   const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin);

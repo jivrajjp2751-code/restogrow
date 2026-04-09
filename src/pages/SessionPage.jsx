@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
-import { startSession, endSession, getCurrentSession, getSessionBills, getSplitReport, getCategories, getSessions } from '../store/data';
+import { startSession, endSession, getSessionBills, getSplitReport } from '../store/data';
 import { Play, Square, Clock, DollarSign, Printer, TrendingUp, BarChart3, Coffee, Wine, Calendar, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 
 export default function SessionPage() {
-  const { currentUser, currentSession, refresh, config = {}, sessions: allSessions = [], categories = [], bills = [], refreshing = false } = useApp();
+  const { currentUser, currentSession, refresh, config = {}, sessions: allSessions = [], categories = [], bills = [] } = useApp();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -27,7 +27,7 @@ export default function SessionPage() {
   const handleEndSession = async () => {
     if (!currentSession) return;
     const sessionBills = getSessionBills(currentSession, bills);
-    const splitReport = getSplitReport(sessionBills, categories);
+    const splitReport = getSplitReport(sessionBills, categories, config);
 
     const report = buildReportData(currentSession, sessionBills, splitReport);
 
@@ -42,7 +42,7 @@ export default function SessionPage() {
 
   const handleViewSession = (session) => {
     const sessionBills = getSessionBills(session, bills);
-    const splitReport = getSplitReport(sessionBills, categories);
+    const splitReport = getSplitReport(sessionBills, categories, config);
     const report = buildReportData(session, sessionBills, splitReport);
     setViewingSession(report);
   };
@@ -158,20 +158,24 @@ export default function SessionPage() {
           </div>
 
           <div className="card">
-            <div className="card-header"><span className="card-title">BAR vs KITCHEN</span></div>
+            <div className="card-header"><span className="card-title">{r.split.barLabel.toUpperCase()} vs {r.split.kitchenLabel.toUpperCase()}</span></div>
             <div className="card-body" style={{ padding: '0 12px' }}>
               <table className="data-table" style={{ marginBottom: '8px' }}>
                 <tbody>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}><Wine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />BAR</td>
-                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{r.split.barQty} items</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{r.split.barTotal}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}><Coffee size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />KITCHEN</td>
-                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{r.split.kitchenQty} items</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-warning)' }}>{config.currency}{r.split.kitchenTotal}</td>
-                  </tr>
+                  {r.split.isBarEnabled && (
+                    <tr>
+                      <td style={{ fontWeight: 600 }}><Wine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{r.split.barLabel.toUpperCase()}</td>
+                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{r.split.barQty} items</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{r.split.barTotal}</td>
+                    </tr>
+                  )}
+                  {r.split.isKitchenEnabled && (
+                    <tr>
+                      <td style={{ fontWeight: 600 }}><Coffee size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{r.split.kitchenLabel.toUpperCase()}</td>
+                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{r.split.kitchenQty} items</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-warning)' }}>{config.currency}{r.split.kitchenTotal}</td>
+                    </tr>
+                  )}
                   <tr style={{ borderTop: '2px solid var(--border-color)' }}>
                     <td style={{ fontWeight: 800 }}>TOTAL</td>
                     <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{r.split.barQty + r.split.kitchenQty} items</td>
@@ -185,39 +189,43 @@ export default function SessionPage() {
 
         {/* Detailed Bar + Kitchen Items */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title"><Wine size={12} style={{ display: 'inline', marginRight: '6px' }} />BAR ITEMS SOLD</span>
-              <span className="badge badge-info">{r.split.barQty} qty</span>
+          {r.split.isBarEnabled && (
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title"><Wine size={12} style={{ display: 'inline', marginRight: '6px' }} />{r.split.barLabel.toUpperCase()} ITEMS SOLD</span>
+                <span className="badge badge-info">{r.split.barQty} qty</span>
+              </div>
+              <div className="card-body" style={{ padding: 0, maxHeight: '300px', overflow: 'auto' }}>
+                <table className="data-table">
+                  <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
+                  <tbody>
+                    {r.split.bar.length > 0 ? r.split.bar.map(item => (
+                      <tr key={item.name}><td style={{ fontWeight: 600 }}>{item.name}</td><td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td><td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td></tr>
+                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No {r.split.barLabel} items sold</td></tr>}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="card-body" style={{ padding: 0, maxHeight: '300px', overflow: 'auto' }}>
-              <table className="data-table">
-                <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
-                <tbody>
-                  {r.split.bar.length > 0 ? r.split.bar.map(item => (
-                    <tr key={item.name}><td style={{ fontWeight: 600 }}>{item.name}</td><td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td><td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td></tr>
-                  )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No bar items sold</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          )}
 
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title"><Coffee size={12} style={{ display: 'inline', marginRight: '6px' }} />KITCHEN ITEMS</span>
-              <span className="badge badge-warning">{r.split.kitchenQty} qty</span>
+          {r.split.isKitchenEnabled && (
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title"><Coffee size={12} style={{ display: 'inline', marginRight: '6px' }} />{r.split.kitchenLabel.toUpperCase()} ITEMS</span>
+                <span className="badge badge-warning">{r.split.kitchenQty} qty</span>
+              </div>
+              <div className="card-body" style={{ padding: 0, maxHeight: '300px', overflow: 'auto' }}>
+                <table className="data-table">
+                  <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
+                  <tbody>
+                    {r.split.kitchen.length > 0 ? r.split.kitchen.map(item => (
+                      <tr key={item.name}><td style={{ fontWeight: 600 }}>{item.name}</td><td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td><td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td></tr>
+                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No {r.split.kitchenLabel} items sold</td></tr>}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="card-body" style={{ padding: 0, maxHeight: '300px', overflow: 'auto' }}>
-              <table className="data-table">
-                <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
-                <tbody>
-                  {r.split.kitchen.length > 0 ? r.split.kitchen.map(item => (
-                    <tr key={item.name}><td style={{ fontWeight: 600 }}>{item.name}</td><td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td><td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td></tr>
-                  )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No kitchen items sold</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -363,6 +371,11 @@ export default function SessionPage() {
 // ===== Print HTML helpers =====
 function buildDailyReportHTML(report, config) {
   const r = report;
+  const isKitchenEnabled = config.isKitchenEnabled !== false;
+  const isBarEnabled = config.isBarEnabled !== false;
+  const barLabel = config.barLabel || 'Bar';
+  const kitchenLabel = config.kitchenLabel || 'Kitchen';
+
   return `<!DOCTYPE html>
 <html><head><title>Daily Report - ${r.session.date}</title>
 <style>
@@ -404,23 +417,27 @@ ${config.phone ? `<div class="c" style="font-size:9px">Tel: ${config.phone}</div
 
 <div class="d"></div>
 
-<h3>Bar vs Kitchen</h3>
-<div class="r"><span>🍸 Bar (${r.split.barQty})</span><span>${config.currency}${r.split.barTotal}</span></div>
-<div class="r"><span>🍽️ Kitchen (${r.split.kitchenQty})</span><span>${config.currency}${r.split.kitchenTotal}</span></div>
+<h3>Breakdown</h3>
+${isBarEnabled ? `<div class="r"><span>${barLabel} (${r.split.barQty})</span><span>${config.currency}${r.split.barTotal}</span></div>` : ''}
+${isKitchenEnabled ? `<div class="r"><span>${kitchenLabel} (${r.split.kitchenQty})</span><span>${config.currency}${r.split.kitchenTotal}</span></div>` : ''}
 
 <div class="d"></div>
 
-<h3>🍸 Bar Items</h3>
+${isBarEnabled ? `
+<h3>${barLabel.toUpperCase()} ITEMS</h3>
 ${r.split.bar.map(i => `<div class="item"><span>${i.name} ×${i.qty}</span><span>${config.currency}${i.revenue}</span></div>`).join('')}
 ${r.split.bar.length === 0 ? '<div class="item"><span>—</span></div>' : ''}
-<div class="total-row"><span>BAR TOTAL</span><span>${config.currency}${r.split.barTotal}</span></div>
+<div class="total-row"><span>${barLabel.toUpperCase()} TOTAL</span><span>${config.currency}${r.split.barTotal}</span></div>
+` : ''}
 
 <div style="margin-top:4px"></div>
 
-<h3>🍽️ Kitchen Items</h3>
+${isKitchenEnabled ? `
+<h3>${kitchenLabel.toUpperCase()} ITEMS</h3>
 ${r.split.kitchen.map(i => `<div class="item"><span>${i.name} ×${i.qty}</span><span>${config.currency}${i.revenue}</span></div>`).join('')}
 ${r.split.kitchen.length === 0 ? '<div class="item"><span>—</span></div>' : ''}
-<div class="total-row"><span>KITCHEN TOTAL</span><span>${config.currency}${r.split.kitchenTotal}</span></div>
+<div class="total-row"><span>${kitchenLabel.toUpperCase()} TOTAL</span><span>${config.currency}${r.split.kitchenTotal}</span></div>
+` : ''}
 
 <div class="d"></div>
 
@@ -448,7 +465,7 @@ function printHTML(html) {
   printDoc.write(html);
   printDoc.close();
   iframe.onload = () => {
-    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch { /* ignore */ }
     setTimeout(() => document.body.removeChild(iframe), 2000);
   };
 }

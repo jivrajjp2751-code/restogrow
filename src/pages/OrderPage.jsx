@@ -53,6 +53,11 @@ export default function OrderPage() {
 
   const safeItems = order?.items || [];
 
+  const isKitchenEnabled = config.isKitchenEnabled !== false;
+  const isBarEnabled = config.isBarEnabled !== false;
+  const barLabel = config.barLabel || 'Bar';
+  const kitchenLabel = config.kitchenLabel || 'Kitchen';
+
   // Classify categories
   const barCategories = useMemo(() => (categories || []).filter(c => c.type === 'bar'), [categories]);
   const kitchenCategories = useMemo(() => (categories || []).filter(c => c.type === 'kitchen'), [categories]);
@@ -64,18 +69,20 @@ export default function OrderPage() {
   const q = searchQuery.toLowerCase();
 
   const barItems = useMemo(() => {
+    if (!isBarEnabled) return [];
     let items = (menuItems || []).filter(i => barCatIds.includes(i.categoryId));
     if (barCategory !== 'all') items = items.filter(i => i.categoryId === barCategory);
     if (isSearching) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
     return items;
-  }, [menuItems, barCategory, searchQuery, barCatIds]);
+  }, [menuItems, barCategory, searchQuery, barCatIds, isBarEnabled]);
 
   const kitchenItems = useMemo(() => {
+    if (!isKitchenEnabled) return [];
     let items = (menuItems || []).filter(i => kitchenCatIds.includes(i.categoryId));
     if (kitchenCategory !== 'all') items = items.filter(i => i.categoryId === kitchenCategory);
     if (isSearching) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
     return items;
-  }, [menuItems, kitchenCategory, searchQuery, kitchenCatIds]);
+  }, [menuItems, kitchenCategory, searchQuery, kitchenCatIds, isKitchenEnabled]);
 
   const handleAddItem = async (menuItem) => {
     if (!order) { addToast("Order not initialized yet", "warning"); return; }
@@ -139,10 +146,11 @@ export default function OrderPage() {
     if (!order || safeItems.length === 0) { addToast('No items', 'warning'); return; }
     try {
       const tableLabel = table?.label || table?.number;
-      const result = printSplitKOT(order, tableLabel, categories);
-      if (result?.kitchenKOT && result?.barKOT) addToast('Kitchen KOT + Bar KOT printed', 'success');
-      else if (result?.kitchenKOT) addToast('Kitchen KOT printed', 'success');
-      else if (result?.barKOT) addToast('Bar KOT printed', 'success');
+      // Pass config to help printer use correct labels
+      const result = printSplitKOT(order, tableLabel, categories, config);
+      if (result?.kitchenKOT && result?.barKOT) addToast(`${kitchenLabel} KOT + ${barLabel} KOT printed`, 'success');
+      else if (result?.kitchenKOT) addToast(`${kitchenLabel} KOT printed`, 'success');
+      else if (result?.barKOT) addToast(`${barLabel} KOT printed`, 'success');
       else addToast('KOT sent', 'success');
     } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
@@ -152,8 +160,8 @@ export default function OrderPage() {
     if (!order) return;
     try {
       const tableLabel = table?.label || table?.number;
-      const success = printKitchenKOT(order, tableLabel, categories);
-      addToast(success ? 'Kitchen KOT printed' : 'No kitchen items', success ? 'success' : 'warning');
+      const success = printKitchenKOT(order, tableLabel, categories, config);
+      addToast(success ? `${kitchenLabel} KOT printed` : `No ${kitchenLabel} items`, success ? 'success' : 'warning');
     } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
   };
@@ -162,8 +170,8 @@ export default function OrderPage() {
     if (!order) return;
     try {
       const tableLabel = table?.label || table?.number;
-      const success = printBarKOT(order, tableLabel, categories);
-      addToast(success ? 'Bar KOT printed' : 'No bar items', success ? 'success' : 'warning');
+      const success = printBarKOT(order, tableLabel, categories, config);
+      addToast(success ? `${barLabel} KOT printed` : `No ${barLabel} items`, success ? 'success' : 'warning');
     } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
   };
@@ -278,19 +286,23 @@ export default function OrderPage() {
               <Printer size={12} /> KOT ▾
             </button>
             {showKOTMenu && (
-              <div className="kot-dropdown">
+              <div className="kot-dropdown" style={{ minWidth: '200px' }}>
                 <button className="kot-dropdown-item" onClick={handlePrintSplitKOT}>
                   <Printer size={12} /> <span>Print All KOT</span>
-                  <span className="kot-dropdown-sub">Kitchen + Bar auto‑split</span>
+                  <span className="kot-dropdown-sub">Split auto‑detect</span>
                 </button>
-                <button className="kot-dropdown-item kitchen" onClick={handlePrintKitchenOnly}>
-                  <Coffee size={12} /> <span>Kitchen KOT Only</span>
-                  <span className="kot-dropdown-sub">{kitchenCount} kitchen items</span>
-                </button>
-                <button className="kot-dropdown-item bar" onClick={handlePrintBarOnly}>
-                  <Wine size={12} /> <span>Bar KOT Only</span>
-                  <span className="kot-dropdown-sub">{barCount} bar items</span>
-                </button>
+                {isKitchenEnabled && (
+                  <button className="kot-dropdown-item kitchen" onClick={handlePrintKitchenOnly}>
+                    <Coffee size={12} /> <span>{kitchenLabel} KOT Only</span>
+                    <span className="kot-dropdown-sub">{kitchenCount} items</span>
+                  </button>
+                )}
+                {isBarEnabled && (
+                  <button className="kot-dropdown-item bar" onClick={handlePrintBarOnly}>
+                    <Wine size={12} /> <span>{barLabel} KOT Only</span>
+                    <span className="kot-dropdown-sub">{barCount} items</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -310,42 +322,58 @@ export default function OrderPage() {
           />
         </div>
 
-        <div className="menu-split-container">
-          <div className="menu-split-section bar">
-            <div className="menu-split-header bar"><Wine size={14} /><span>BAR</span><span style={{ fontSize: '9px', opacity: 0.6 }}>{barItems.length}</span></div>
-            {!isSearching && (
-              <div className="category-tabs compact">
-                <button className={`category-tab ${barCategory === 'all' ? 'active' : ''}`} onClick={() => setBarCategory('all')}>ALL</button>
-                {barCategories.map(cat => (
-                  <button key={cat.id} className={`category-tab ${barCategory === cat.id ? 'active' : ''}`} onClick={() => setBarCategory(cat.id)}>
-                    {cat.icon} {cat.name}
-                  </button>
-                ))}
+        <div className="menu-split-container" style={{ 
+          display: 'grid', 
+          gridTemplateColumns: isBarEnabled && isKitchenEnabled ? '1fr 1fr' : '1fr', 
+          gap: '12px' 
+        }}>
+          {isBarEnabled && (
+            <div className="menu-split-section bar">
+              <div className="menu-split-header bar">
+                <Wine size={14} />
+                <span>{barLabel.toUpperCase()}</span>
+                <span style={{ fontSize: '9px', opacity: 0.6 }}>{barItems.length}</span>
               </div>
-            )}
-            <div className="menu-items-grid compact">
-              {barItems.map(renderItemCard)}
-              {barItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No bar items</p></div>}
+              {!isSearching && (
+                <div className="category-tabs compact">
+                  <button className={`category-tab ${barCategory === 'all' ? 'active' : ''}`} onClick={() => setBarCategory('all')}>ALL</button>
+                  {barCategories.map(cat => (
+                    <button key={cat.id} className={`category-tab ${barCategory === cat.id ? 'active' : ''}`} onClick={() => setBarCategory(cat.id)}>
+                      {cat.icon} {cat.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="menu-items-grid compact">
+                {barItems.map(renderItemCard)}
+                {barItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No items</p></div>}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="menu-split-section kitchen">
-            <div className="menu-split-header kitchen"><Coffee size={14} /><span>KITCHEN</span><span style={{ fontSize: '9px', opacity: 0.6 }}>{kitchenItems.length}</span></div>
-            {!isSearching && (
-              <div className="category-tabs compact">
-                <button className={`category-tab ${kitchenCategory === 'all' ? 'active' : ''}`} onClick={() => setKitchenCategory('all')}>ALL</button>
-                {kitchenCategories.map(cat => (
-                  <button key={cat.id} className={`category-tab ${kitchenCategory === cat.id ? 'active' : ''}`} onClick={() => setKitchenCategory(cat.id)}>
-                    {cat.icon} {cat.name}
-                  </button>
-                ))}
+          {isKitchenEnabled && (
+            <div className="menu-split-section kitchen">
+              <div className="menu-split-header kitchen">
+                <Coffee size={14} />
+                <span>{kitchenLabel.toUpperCase()}</span>
+                <span style={{ fontSize: '9px', opacity: 0.6 }}>{kitchenItems.length}</span>
               </div>
-            )}
-            <div className="menu-items-grid compact">
-              {kitchenItems.map(renderItemCard)}
-              {kitchenItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No kitchen items</p></div>}
+              {!isSearching && (
+                <div className="category-tabs compact">
+                  <button className={`category-tab ${kitchenCategory === 'all' ? 'active' : ''}`} onClick={() => setKitchenCategory('all')}>ALL</button>
+                  {kitchenCategories.map(cat => (
+                    <button key={cat.id} className={`category-tab ${kitchenCategory === cat.id ? 'active' : ''}`} onClick={() => setKitchenCategory(cat.id)}>
+                      {cat.icon} {cat.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="menu-items-grid compact">
+                {kitchenItems.map(renderItemCard)}
+                {kitchenItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No items</p></div>}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

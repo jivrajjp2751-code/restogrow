@@ -47,8 +47,15 @@ export async function syncAll() {
       supabase.from(table).select('*').eq('restaurant_id', _restaurantId)
     );
     
-    const responses = await Promise.all(fetchPromises);
+    // Also fetch restaurant status
+    const restPromise = supabase.from('restaurants').select('status, name').eq('id', _restaurantId).single();
     
+    const [responses, restRes] = await Promise.all([Promise.all(fetchPromises), restPromise]);
+    
+    if (restRes.data) {
+      results.restaurant = restRes.data;
+    }
+
     responses.forEach((res, index) => {
       const tableName = tableNames[index];
       if (res.error) {
@@ -391,8 +398,14 @@ export function subscribeToChanges(callback) {
 }
 
 // ===== COMPUTED HELPERS =====
-export function getSplitReport(bills, categories) {
-  if (!bills || !categories) return { bar: [], kitchen: [], barTotal: 0, kitchenTotal: 0, barQty: 0, kitchenQty: 0 };
+export function getSplitReport(bills, categories, config = {}) {
+  const isKitchenEnabled = config.isKitchenEnabled !== false;
+  const isBarEnabled = config.isBarEnabled !== false;
+  const barLabel = config.barLabel || 'Bar';
+  const kitchenLabel = config.kitchenLabel || 'Kitchen';
+
+  if (!bills || !categories) return { bar: [], kitchen: [], barTotal: 0, kitchenTotal: 0, barQty: 0, kitchenQty: 0, barLabel, kitchenLabel };
+  
   const allItems = [];
   bills.forEach(bill => (bill.items || []).forEach(item => {
     const qty = item.quantity || 0;
@@ -405,14 +418,20 @@ export function getSplitReport(bills, categories) {
        allItems.push({ ...item, qty, revenue: price * qty });
     }
   }));
-  const bar = allItems.filter(i => i.categoryType !== 'kitchen').sort((a,b) => b.qty - a.qty);
-  const kitchen = allItems.filter(i => i.categoryType === 'kitchen').sort((a,b) => b.qty - a.qty);
+
+  const bar = isBarEnabled ? allItems.filter(i => i.categoryType !== 'kitchen').sort((a,b) => b.qty - a.qty) : [];
+  const kitchen = isKitchenEnabled ? allItems.filter(i => i.categoryType === 'kitchen').sort((a,b) => b.qty - a.qty) : [];
+  
   return {
     bar, kitchen,
     barTotal: bar.reduce((s,i) => s + i.revenue, 0),
     kitchenTotal: kitchen.reduce((s,i) => s + i.revenue, 0),
     barQty: bar.reduce((s,i) => s + i.qty, 0),
     kitchenQty: kitchen.reduce((s,i) => s + i.qty, 0),
+    barLabel,
+    kitchenLabel,
+    isBarEnabled,
+    isKitchenEnabled
   };
 }
 

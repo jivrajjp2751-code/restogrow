@@ -71,6 +71,17 @@ export default function MasterPortal() {
     }
   };
 
+  const toggleStatus = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+    try {
+      const { error } = await supabase.from('restaurants').update({ status: newStatus }).eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (e) {
+      alert('Error updating status: ' + e.message);
+    }
+  };
+
   const deleteRestaurant = async (id, name) => {
     if (!window.confirm(`WARNING: Are you absolutely sure you want to delete ${name}? This will permanently wipe all users, orders, bills, and data for this hotel.`)) return;
     try {
@@ -151,20 +162,43 @@ export default function MasterPortal() {
                 ) : (
                   restaurants.map(r => {
                     const adminUser = r.users?.find(u => u.role === 'admin') || r.users?.[0];
+                    const isActive = r.status === 'active';
                     return (
                     <tr key={r.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                       <td style={{ padding: '16px 24px', fontWeight: 600, color: '#0F172A' }}>{r.name}</td>
                       <td style={{ padding: '16px 24px', fontSize: '12px', color: '#334155', fontFamily: 'monospace' }}>
                          {adminUser ? ( <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><div><b>U:</b> {adminUser.email}</div><div><b>P:</b> {adminUser.password}</div></div> ) : <span style={{ color: '#94A3B8' }}>None</span>}
                       </td>
-                      <td style={{ padding: '16px 24px' }}><span className="badge badge-success" style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', background: '#D1FAE5', color: '#065F46', fontWeight: 600 }}>{r.status.toUpperCase()}</span></td>
+                      <td style={{ padding: '16px 24px' }}>
+                        <span className={`badge ${isActive ? 'badge-success' : 'badge-danger'}`} style={{ 
+                          padding: '6px 10px', 
+                          borderRadius: '6px', 
+                          fontSize: '11px', 
+                          background: isActive ? '#D1FAE5' : '#FFE4E6', 
+                          color: isActive ? '#065F46' : '#991B1B', 
+                          fontWeight: 600 
+                        }}>
+                          {r.status.toUpperCase()}
+                        </span>
+                      </td>
                       <td style={{ padding: '16px 24px', fontSize: '13px', color: '#64748B' }}>{new Date(r.createdAt || r.created_at || new Date()).toLocaleDateString()}</td>
                       <td style={{ textAlign: 'right', paddingRight: '24px' }}>
                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                           <button onClick={() => toggleStatus(r.id, r.status)} style={{ 
+                             color: isActive ? '#D97706' : '#059669', 
+                             background: isActive ? '#FEF3C7' : '#D1FAE5', 
+                             padding: '6px 12px', 
+                             borderRadius: '6px', 
+                             fontSize: '12px', 
+                             fontWeight: 600, 
+                             cursor: 'pointer', 
+                             border: 'none', 
+                             transition: '0.2s',
+                             minWidth: '100px'
+                           }}>
+                             {isActive ? 'SUSPEND' : 'ACTIVATE'}
+                           </button>
                            <button onClick={(e) => { e.preventDefault(); deleteRestaurant(r.id, r.name); }} style={{ color: '#EF4444', background: '#FEF2F2', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', transition: '0.2s' }}>DELETE</button>
-                           <a href={`/#/login`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', gap: '6px', display: 'inline-flex', alignItems: 'center', background: '#F1F5F9', color: '#334155', padding: '8px 16px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, transition: 'all 0.2s' }}>
-                             LOGIN <ExternalLink size={14} />
-                           </a>
                          </div>
                       </td>
                     </tr>

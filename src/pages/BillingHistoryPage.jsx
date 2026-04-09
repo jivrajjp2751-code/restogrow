@@ -4,7 +4,7 @@ import { printBillDirect } from '../utils/print';
 import { Search, Printer, Receipt } from 'lucide-react';
 
 export default function BillingHistoryPage() {
-  const { bills: rawBills, config, refresh, refreshing = false } = useApp();
+  const { bills: rawBills, config } = useApp();
   const bills = [...(rawBills || [])].reverse();
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { syncAll, authenticateUser, setTenant, getTenant, subscribeToChanges } from '../store/data';
+import { syncAll, setTenant, getTenant, subscribeToChanges } from '../store/data';
 
 const ToastContext = createContext();
 
@@ -30,7 +30,7 @@ export const useToast = () => useContext(ToastContext);
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
-  const [theme, setTheme] = useState('light');
+  const theme = 'light';
   const [tenantId, setTenantId] = useState(() => localStorage.getItem('rg_tenant_id'));
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -41,7 +41,8 @@ export function AppProvider({ children }) {
 
   const [data, setData] = useState({
     tables: [], sections: [], categories: [], menu_items: [], users: [], orders: [], order_items: [], bills: [], bill_items: [], sessions: [],
-    config: { restaurantName: 'RestoGrow', currency: '₹', taxRate: 0, serviceChargeRate: 0 }
+    config: { restaurantName: 'RestoGrow', currency: '₹', taxRate: 0, serviceChargeRate: 0 },
+    restaurant: { status: 'active', name: '' }
   });
 
   const [loading, setLoading] = useState(true);
@@ -131,6 +132,7 @@ export function AppProvider({ children }) {
       users: data.users,
       sessions: data.sessions,
       inventory_log: data.inventory_log || [],
+      restaurant: data.restaurant,
       currentSession,
       refresh,
       loading,

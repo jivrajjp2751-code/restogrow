@@ -54,6 +54,32 @@ export default function SettingsPage() {
       </div>
 
       <div className="config-section">
+        <h3 className="config-section-title">🏢 DEPARTMENTS</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '12px' }}>
+          Enable or disable service areas and customize their names (e.g. rename 'Bar' to 'Cafe').
+        </p>
+        <div className="config-grid">
+           <div className="input-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
+             <input type="checkbox" checked={form.isKitchenEnabled !== false} onChange={e => setForm(f => ({ ...f, isKitchenEnabled: e.target.checked }))} />
+             <label className="input-label" style={{ marginBottom: 0 }}>Enable Kitchen</label>
+           </div>
+           <div className="input-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
+             <input type="checkbox" checked={form.isBarEnabled !== false} onChange={e => setForm(f => ({ ...f, isBarEnabled: e.target.checked }))} />
+             <label className="input-label" style={{ marginBottom: 0 }}>Enable Bar/Cafe</label>
+           </div>
+           
+           <div className="input-group">
+             <label className="input-label">Kitchen Label</label>
+             <input className="input" value={form.kitchenLabel || 'Kitchen'} onChange={e => setForm(f => ({ ...f, kitchenLabel: e.target.value }))} disabled={form.isKitchenEnabled === false} />
+           </div>
+           <div className="input-group">
+             <label className="input-label">Bar/Cafe Label</label>
+             <input className="input" value={form.barLabel || 'Bar'} onChange={e => setForm(f => ({ ...f, barLabel: e.target.value }))} disabled={form.isBarEnabled === false} />
+           </div>
+        </div>
+      </div>
+
+      <div className="config-section">
         <h3 className="config-section-title">✨ DEMO & ONBOARDING</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '8px' }}>
           Generate a full set of sample Categories, Menu Items, Sections, and Tables to preview the system instantly.

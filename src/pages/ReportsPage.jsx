@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { getBills, getCategories, getSplitReport, getMonthBills, getMostSoldLiquor, getSessions, getSessionBills } from '../store/data';
+import { getSplitReport, getMonthBills, getMostSoldLiquor, getSessionBills } from '../store/data';
 import { TrendingUp, Calendar, DollarSign, PieChart, Printer, Wine, Coffee, Award } from 'lucide-react';
 
 export default function ReportsPage() {
-  const { config = {}, categories = [], bills = [], sessions = [], refreshing = false } = useApp();
+  const { config = {}, categories = [], bills = [], sessions = [] } = useApp();
   const [reportType, setReportType] = useState('daily'); // daily, monthly, session
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selectedSessionId, setSelectedSessionId] = useState('');
@@ -36,7 +36,7 @@ export default function ReportsPage() {
   const totalItems = filteredBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
   
   // Split Report: bar vs kitchen
-  const splitReport = getSplitReport(filteredBills, categories);
+  const splitReport = getSplitReport(filteredBills, categories, config);
 
   // Payment Breakdown
   const paymentSales = { Cash: 0, Card: 0, UPI: 0 };
@@ -57,8 +57,9 @@ export default function ReportsPage() {
     (bill.items || []).forEach(item => {
       // bill_items only have categoryType, not categoryId
       const catType = item.categoryType || 'bar';
-      const catName = catType === 'kitchen' ? 'Kitchen' : 'Bar';
-      const catColor = catType === 'kitchen' ? '#FDCB6E' : '#6C5CE7';
+      const isKit = catType === 'kitchen';
+      const catName = isKit ? splitReport.kitchenLabel : splitReport.barLabel;
+      const catColor = isKit ? '#FDCB6E' : '#6C5CE7';
       if (!categorySales[catName]) categorySales[catName] = { qty: 0, revenue: 0, color: catColor, type: catType };
       categorySales[catName].qty += (item.quantity || 0);
       categorySales[catName].revenue += (item.price || 0) * (item.quantity || 0);
@@ -107,27 +108,29 @@ ${config.address ? `<div class="c" style="font-size:10px">${config.address}</div
 <div class="r"><span>UPI</span><span>${config.currency}${paymentSales.UPI}</span></div>
 <div class="d"></div>
 
-<h3>Bar vs Kitchen Summary</h3>
-<div class="r"><span>🍸 Bar: ${splitReport.barQty} items</span><span>${config.currency}${splitReport.barTotal}</span></div>
-<div class="r"><span>🍽️ Kitchen: ${splitReport.kitchenQty} items</span><span>${config.currency}${splitReport.kitchenTotal}</span></div>
+<h3>Sales Summary</h3>
+${splitReport.isBarEnabled ? `<div class="r"><span>${splitReport.barLabel}: ${splitReport.barQty} items</span><span>${config.currency}${splitReport.barTotal}</span></div>` : ''}
+${splitReport.isKitchenEnabled ? `<div class="r"><span>${splitReport.kitchenLabel}: ${splitReport.kitchenQty} items</span><span>${config.currency}${splitReport.kitchenTotal}</span></div>` : ''}
 <div class="d"></div>
 
-<div class="section-title">🍸 BAR ITEMS</div>
+${splitReport.isBarEnabled ? `
+<div class="section-title">${splitReport.barLabel.toUpperCase()} ITEMS</div>
 <table>
 <tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th></tr>
 ${splitReport.bar.map(i => `<tr><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
-<tr class="total-row"><td>BAR TOTAL</td><td style="text-align:center">${splitReport.barQty}</td><td style="text-align:right">${config.currency}${splitReport.barTotal}</td></tr>
-</table>
+<tr class="total-row"><td>${splitReport.barLabel.toUpperCase()} TOTAL</td><td style="text-align:center">${splitReport.barQty}</td><td style="text-align:right">${config.currency}${splitReport.barTotal}</td></tr>
+</table>` : ''}
 
-<div class="section-title">🍽️ KITCHEN ITEMS</div>
+${splitReport.isKitchenEnabled ? `
+<div class="section-title">${splitReport.kitchenLabel.toUpperCase()} ITEMS</div>
 <table>
 <tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th></tr>
 ${splitReport.kitchen.map(i => `<tr><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
-<tr class="total-row"><td>KITCHEN TOTAL</td><td style="text-align:center">${splitReport.kitchenQty}</td><td style="text-align:right">${config.currency}${splitReport.kitchenTotal}</td></tr>
-</table>
+<tr class="total-row"><td>${splitReport.kitchenLabel.toUpperCase()} TOTAL</td><td style="text-align:center">${splitReport.kitchenQty}</td><td style="text-align:right">${config.currency}${splitReport.kitchenTotal}</td></tr>
+</table>` : ''}
 
-${reportType === 'monthly' && mostSoldLiquor.length > 0 ? `
-<div class="section-title">🏆 MOST SOLD LIQUOR (${reportLabel})</div>
+${reportType === 'monthly' && mostSoldLiquor.length > 0 && splitReport.isBarEnabled ? `
+<div class="section-title">🏆 MOST SOLD ${splitReport.barLabel.toUpperCase()} (${reportLabel})</div>
 <table>
 <tr><th>#</th><th>Item</th><th style="text-align:center">Qty Sold</th><th style="text-align:right">Revenue</th></tr>
 ${mostSoldLiquor.slice(0, 20).map((i, idx) => `<tr><td>${idx + 1}</td><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
@@ -239,20 +242,24 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
 
           {/* Bar vs Kitchen Split */}
           <div className="card">
-            <div className="card-header"><span className="card-title">BAR vs KITCHEN</span></div>
+            <div className="card-header"><span className="card-title">{splitReport.barLabel.toUpperCase()} vs {splitReport.kitchenLabel.toUpperCase()}</span></div>
             <div className="card-body" style={{ padding: '0 12px' }}>
               <table className="data-table" style={{ marginBottom: '8px' }}>
                 <tbody>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}><Wine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />BAR</td>
-                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{splitReport.barQty} items</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{splitReport.barTotal}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}><Coffee size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />KITCHEN</td>
-                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{splitReport.kitchenQty} items</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-warning)' }}>{config.currency}{splitReport.kitchenTotal}</td>
-                  </tr>
+                  {splitReport.isBarEnabled && (
+                    <tr>
+                      <td style={{ fontWeight: 600 }}><Wine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{splitReport.barLabel.toUpperCase()}</td>
+                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{splitReport.barQty} items</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{splitReport.barTotal}</td>
+                    </tr>
+                  )}
+                  {splitReport.isKitchenEnabled && (
+                    <tr>
+                      <td style={{ fontWeight: 600 }}><Coffee size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{splitReport.kitchenLabel.toUpperCase()}</td>
+                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{splitReport.kitchenQty} items</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-warning)' }}>{config.currency}{splitReport.kitchenTotal}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -285,60 +292,64 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
         {/* Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Bar Items Detail */}
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title"><Wine size={12} style={{ display: 'inline', marginRight: '6px' }} />BAR ITEMS SOLD</span>
-              <span className="badge badge-info">{splitReport.barQty} qty · {config.currency}{splitReport.barTotal}</span>
-            </div>
-            <div className="card-body" style={{ padding: 0, maxHeight: '250px', overflow: 'auto' }}>
-              <table className="data-table">
-                <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>SOLD</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
-                <tbody>
-                  {splitReport.bar.length > 0 ? splitReport.bar.map((item, idx) => (
-                    <tr key={item.name}>
-                      <td>
-                        <span style={{ display: 'inline-block', width: '16px', color: 'var(--text-tertiary)', fontSize: '10px' }}>{idx+1}.</span>
-                        <span style={{ fontWeight: 600 }}>{item.name}</span>
-                      </td>
-                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
-                    </tr>
-                  )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No bar items sold</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Kitchen Items Detail */}
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title"><Coffee size={12} style={{ display: 'inline', marginRight: '6px' }} />KITCHEN ITEMS SOLD</span>
-              <span className="badge badge-warning">{splitReport.kitchenQty} qty · {config.currency}{splitReport.kitchenTotal}</span>
-            </div>
-            <div className="card-body" style={{ padding: 0, maxHeight: '200px', overflow: 'auto' }}>
-              <table className="data-table">
-                <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>SOLD</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
-                <tbody>
-                  {splitReport.kitchen.length > 0 ? splitReport.kitchen.map((item, idx) => (
-                    <tr key={item.name}>
-                      <td>
-                        <span style={{ display: 'inline-block', width: '16px', color: 'var(--text-tertiary)', fontSize: '10px' }}>{idx+1}.</span>
-                        <span style={{ fontWeight: 600 }}>{item.name}</span>
-                      </td>
-                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
-                    </tr>
-                  )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No kitchen items sold</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Most Sold Liquor (Monthly Only) */}
-          {reportType === 'monthly' && (
+          {splitReport.isBarEnabled && (
             <div className="card">
               <div className="card-header">
-                <span className="card-title"><Award size={12} style={{ display: 'inline', marginRight: '6px' }} />MOST SOLD LIQUOR</span>
+                <span className="card-title"><Wine size={12} style={{ display: 'inline', marginRight: '6px' }} />{splitReport.barLabel.toUpperCase()} ITEMS SOLD</span>
+                <span className="badge badge-info">{splitReport.barQty} qty · {config.currency}{splitReport.barTotal}</span>
+              </div>
+              <div className="card-body" style={{ padding: 0, maxHeight: '250px', overflow: 'auto' }}>
+                <table className="data-table">
+                  <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>SOLD</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
+                  <tbody>
+                    {splitReport.bar.length > 0 ? splitReport.bar.map((item, idx) => (
+                      <tr key={item.name}>
+                        <td>
+                          <span style={{ display: 'inline-block', width: '16px', color: 'var(--text-tertiary)', fontSize: '10px' }}>{idx+1}.</span>
+                          <span style={{ fontWeight: 600 }}>{item.name}</span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
+                      </tr>
+                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No {splitReport.barLabel} items sold</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Kitchen Items Detail */}
+          {splitReport.isKitchenEnabled && (
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title"><Coffee size={12} style={{ display: 'inline', marginRight: '6px' }} />{splitReport.kitchenLabel.toUpperCase()} ITEMS SOLD</span>
+                <span className="badge badge-warning">{splitReport.kitchenQty} qty · {config.currency}{splitReport.kitchenTotal}</span>
+              </div>
+              <div className="card-body" style={{ padding: 0, maxHeight: '200px', overflow: 'auto' }}>
+                <table className="data-table">
+                  <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>SOLD</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
+                  <tbody>
+                    {splitReport.kitchen.length > 0 ? splitReport.kitchen.map((item, idx) => (
+                      <tr key={item.name}>
+                        <td>
+                          <span style={{ display: 'inline-block', width: '16px', color: 'var(--text-tertiary)', fontSize: '10px' }}>{idx+1}.</span>
+                          <span style={{ fontWeight: 600 }}>{item.name}</span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
+                      </tr>
+                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No {splitReport.kitchenLabel} items sold</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Most Sold Liquor (Monthly Only) */}
+          {reportType === 'monthly' && splitReport.isBarEnabled && (
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title"><Award size={12} style={{ display: 'inline', marginRight: '6px' }} />MOST SOLD {splitReport.barLabel.toUpperCase()}</span>
               </div>
               <div className="card-body" style={{ padding: 0, maxHeight: '250px', overflow: 'auto' }}>
                 <table className="data-table">
@@ -353,7 +364,7 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
                         <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{item.qty}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
                       </tr>
-                    )) : <tr><td colSpan="4" style={{ textAlign: 'center', padding: '16px' }}>No liquor sold this month</td></tr>}
+                    )) : <tr><td colSpan="4" style={{ textAlign: 'center', padding: '16px' }}>No {splitReport.barLabel} sold this month</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -381,7 +392,7 @@ function printHTML(html) {
   printDoc.write(html);
   printDoc.close();
   iframe.onload = () => {
-    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch { /* ignore */ }
     setTimeout(() => document.body.removeChild(iframe), 2000);
   };
 }

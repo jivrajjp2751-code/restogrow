@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Clock, CheckCircle } from 'lucide-react';
 
 export default function OrdersListPage() {
-  const { orders = [], config = {}, refreshing = false } = useApp();
+  const { orders = [], config = {} } = useApp();
   const navigate = useNavigate();
 
   const activeOrders = (orders || []).filter(o => o.status === 'active');
