@@ -17,8 +17,9 @@ export default function OrderPage() {
 
   const table = useMemo(() => (tables || []).find(t => t.id === tableId), [tables, tableId]);
   const [order, setOrder] = useState(null);
-  const [barCategory, setBarCategory] = useState('all');
-  const [kitchenCategory, setKitchenCategory] = useState('all');
+  const depts = useMemo(() => config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}], [config]);
+  const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id || 'kitchen');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [noteModal, setNoteModal] = useState(null);
   const [noteText, setNoteText] = useState('');
@@ -53,36 +54,24 @@ export default function OrderPage() {
 
   const safeItems = order?.items || [];
 
-  const isKitchenEnabled = config.isKitchenEnabled !== false;
-  const isBarEnabled = config.isBarEnabled !== false;
-  const barLabel = config.barLabel || 'Bar';
-  const kitchenLabel = config.kitchenLabel || 'Kitchen';
+  const activeDept = useMemo(() => depts.find(d => d.id === activeDeptId) || depts[0], [depts, activeDeptId]);
 
   // Classify categories
-  const barCategories = useMemo(() => (categories || []).filter(c => c.type === 'bar'), [categories]);
-  const kitchenCategories = useMemo(() => (categories || []).filter(c => c.type === 'kitchen'), [categories]);
-  const barCatIds = useMemo(() => barCategories.map(c => c.id), [barCategories]);
-  const kitchenCatIds = useMemo(() => kitchenCategories.map(c => c.id), [kitchenCategories]);
+  const deptCategories = useMemo(() => (categories || []).filter(c => c.type === activeDept?.id), [categories, activeDept]);
+  const deptCatIds = useMemo(() => deptCategories.map(c => c.id), [deptCategories]);
 
   // Filter items
   const isSearching = searchQuery.length > 0;
   const q = searchQuery.toLowerCase();
 
-  const barItems = useMemo(() => {
-    if (!isBarEnabled) return [];
-    let items = (menuItems || []).filter(i => barCatIds.includes(i.categoryId));
-    if (barCategory !== 'all') items = items.filter(i => i.categoryId === barCategory);
-    if (isSearching) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
+  const deptItems = useMemo(() => {
+    let items = (menuItems || []).filter(i => deptCatIds.includes(i.categoryId));
+    if (categoryFilter !== 'all') items = items.filter(i => i.categoryId === categoryFilter);
+    if (isSearching) {
+      items = (menuItems || []).filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
+    }
     return items;
-  }, [menuItems, barCategory, searchQuery, barCatIds, isBarEnabled]);
-
-  const kitchenItems = useMemo(() => {
-    if (!isKitchenEnabled) return [];
-    let items = (menuItems || []).filter(i => kitchenCatIds.includes(i.categoryId));
-    if (kitchenCategory !== 'all') items = items.filter(i => i.categoryId === kitchenCategory);
-    if (isSearching) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
-    return items;
-  }, [menuItems, kitchenCategory, searchQuery, kitchenCatIds, isKitchenEnabled]);
+  }, [menuItems, categoryFilter, searchQuery, deptCatIds, isSearching, q]);
 
   const handleAddItem = async (menuItem) => {
     if (!order) { addToast("Order not initialized yet", "warning"); return; }
@@ -146,32 +135,30 @@ export default function OrderPage() {
     if (!order || safeItems.length === 0) { addToast('No items', 'warning'); return; }
     try {
       const tableLabel = table?.label || table?.number;
-      // Pass config to help printer use correct labels
-      const result = printSplitKOT(order, tableLabel, categories, config);
-      if (result?.kitchenKOT && result?.barKOT) addToast(`${kitchenLabel} KOT + ${barLabel} KOT printed`, 'success');
-      else if (result?.kitchenKOT) addToast(`${kitchenLabel} KOT printed`, 'success');
-      else if (result?.barKOT) addToast(`${barLabel} KOT printed`, 'success');
-      else addToast('KOT sent', 'success');
+      printSplitKOT(order, tableLabel, categories, config);
+      addToast('KOT printed for respective departments', 'success');
     } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
   };
 
-  const handlePrintKitchenOnly = () => {
+  const handlePrintDeptOnly = (deptId) => {
     if (!order) return;
     try {
       const tableLabel = table?.label || table?.number;
-      const success = printKitchenKOT(order, tableLabel, categories, config);
-      addToast(success ? `${kitchenLabel} KOT printed` : `No ${kitchenLabel} items`, success ? 'success' : 'warning');
-    } catch (e) { addToast('Print failed', 'error'); }
-    setShowKOTMenu(false);
-  };
-
-  const handlePrintBarOnly = () => {
-    if (!order) return;
-    try {
-      const tableLabel = table?.label || table?.number;
-      const success = printBarKOT(order, tableLabel, categories, config);
-      addToast(success ? `${barLabel} KOT printed` : `No ${barLabel} items`, success ? 'success' : 'warning');
+      // Filter the order items to only include those belonging to deptId categories
+      const deptCatIdsLocal = categories.filter(c => c.type === deptId).map(c => c.id);
+      const filteredOrder = {
+        ...order,
+        items: order.items.filter(i => deptCatIdsLocal.includes(i.categoryId))
+      };
+      
+      if (filteredOrder.items.length === 0) {
+        addToast('No items for this department', 'warning');
+        return;
+      }
+      
+      const res = printSplitKOT(filteredOrder, tableLabel, categories, config);
+      addToast('Department KOT printed', 'success');
     } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
   };
@@ -215,8 +202,7 @@ export default function OrderPage() {
   const tax = (subtotal * (config.taxRate || 0)) / 100;
   const serviceCharge = (subtotal * (config.serviceChargeRate || 0)) / 100;
   const total = subtotal + tax + serviceCharge;
-  const kitchenCount = safeItems.filter(i => i.categoryType === 'kitchen').length;
-  const barCount = safeItems.filter(i => i.categoryType !== 'kitchen').length;
+  // Generic counts removed. total is sufficient.
 
   if (!table && !orderLoading) {
     return (
@@ -291,18 +277,15 @@ export default function OrderPage() {
                   <Printer size={12} /> <span>Print All KOT</span>
                   <span className="kot-dropdown-sub">Split auto‑detect</span>
                 </button>
-                {isKitchenEnabled && (
-                  <button className="kot-dropdown-item kitchen" onClick={handlePrintKitchenOnly}>
-                    <Coffee size={12} /> <span>{kitchenLabel} KOT Only</span>
-                    <span className="kot-dropdown-sub">{kitchenCount} items</span>
-                  </button>
-                )}
-                {isBarEnabled && (
-                  <button className="kot-dropdown-item bar" onClick={handlePrintBarOnly}>
-                    <Wine size={12} /> <span>{barLabel} KOT Only</span>
-                    <span className="kot-dropdown-sub">{barCount} items</span>
-                  </button>
-                )}
+                {depts.map(dept => {
+                   const deptCount = safeItems.filter(i => categories.find(c => c.id === i.categoryId)?.type === dept.id).length;
+                   return (
+                     <button key={dept.id} className="kot-dropdown-item bar" onClick={() => handlePrintDeptOnly(dept.id)}>
+                       <Printer size={12} /> <span>{dept.name} KOT Only</span>
+                       <span className="kot-dropdown-sub">{deptCount} items</span>
+                     </button>
+                   );
+                })}
               </div>
             )}
           </div>
@@ -314,66 +297,38 @@ export default function OrderPage() {
             onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter') {
-                const allResults = [...barItems, ...kitchenItems];
-                if (allResults.length === 1) { handleAddItem(allResults[0]); setSearchQuery(''); }
+                if (deptItems.length === 1) { handleAddItem(deptItems[0]); setSearchQuery(''); }
               }
               if (e.key === 'Escape') { setSearchQuery(''); e.target.blur(); }
             }}
           />
         </div>
 
-        <div className="menu-split-container" style={{ 
-          display: 'grid', 
-          gridTemplateColumns: isBarEnabled && isKitchenEnabled ? '1fr 1fr' : '1fr', 
-          gap: '12px' 
-        }}>
-          {isBarEnabled && (
-            <div className="menu-split-section bar">
-              <div className="menu-split-header bar">
-                <Wine size={14} />
-                <span>{barLabel.toUpperCase()}</span>
-                <span style={{ fontSize: '9px', opacity: 0.6 }}>{barItems.length}</span>
-              </div>
-              {!isSearching && (
-                <div className="category-tabs compact">
-                  <button className={`category-tab ${barCategory === 'all' ? 'active' : ''}`} onClick={() => setBarCategory('all')}>ALL</button>
-                  {barCategories.map(cat => (
-                    <button key={cat.id} className={`category-tab ${barCategory === cat.id ? 'active' : ''}`} onClick={() => setBarCategory(cat.id)}>
-                      {cat.icon} {cat.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="menu-items-grid compact">
-                {barItems.map(renderItemCard)}
-                {barItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No items</p></div>}
-              </div>
-            </div>
-          )}
+        <div className="category-tabs compact" style={{ padding: '0 8px 8px', borderBottom: '1px solid var(--border-color)', marginBottom: '8px' }}>
+          {depts.map(dept => (
+             <button key={dept.id} className={`category-tab ${activeDeptId === dept.id ? 'active' : ''}`} onClick={() => { setActiveDeptId(dept.id); setCategoryFilter('all'); }}>
+                {dept.name}
+             </button>
+          ))}
+        </div>
 
-          {isKitchenEnabled && (
-            <div className="menu-split-section kitchen">
-              <div className="menu-split-header kitchen">
-                <Coffee size={14} />
-                <span>{kitchenLabel.toUpperCase()}</span>
-                <span style={{ fontSize: '9px', opacity: 0.6 }}>{kitchenItems.length}</span>
-              </div>
+        <div className="menu-split-container" style={{ display: 'block', height: 'calc(100% - 150px)', overflowY: 'auto' }}>
+            <div className="menu-split-section" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               {!isSearching && (
-                <div className="category-tabs compact">
-                  <button className={`category-tab ${kitchenCategory === 'all' ? 'active' : ''}`} onClick={() => setKitchenCategory('all')}>ALL</button>
-                  {kitchenCategories.map(cat => (
-                    <button key={cat.id} className={`category-tab ${kitchenCategory === cat.id ? 'active' : ''}`} onClick={() => setKitchenCategory(cat.id)}>
+                <div className="category-tabs compact" style={{ padding: '0 10px', marginBottom: '8px' }}>
+                  <button className={`category-tab ${categoryFilter === 'all' ? 'active' : ''}`} onClick={() => setCategoryFilter('all')}>ALL</button>
+                  {deptCategories.map(cat => (
+                    <button key={cat.id} className={`category-tab ${categoryFilter === cat.id ? 'active' : ''}`} onClick={() => setCategoryFilter(cat.id)}>
                       {cat.icon} {cat.name}
                     </button>
                   ))}
                 </div>
               )}
-              <div className="menu-items-grid compact">
-                {kitchenItems.map(renderItemCard)}
-                {kitchenItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No items</p></div>}
+              <div className="menu-items-grid compact" style={{ padding: '0 10px 10px' }}>
+                {deptItems.map(renderItemCard)}
+                {deptItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No items</p></div>}
               </div>
             </div>
-          )}
         </div>
       </div>
 

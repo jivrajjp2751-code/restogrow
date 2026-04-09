@@ -399,12 +399,9 @@ export function subscribeToChanges(callback) {
 
 // ===== COMPUTED HELPERS =====
 export function getSplitReport(bills, categories, config = {}) {
-  const isKitchenEnabled = config.isKitchenEnabled !== false;
-  const isBarEnabled = config.isBarEnabled !== false;
-  const barLabel = config.barLabel || 'Bar';
-  const kitchenLabel = config.kitchenLabel || 'Kitchen';
+  const depts = config.departments || [{id: 'kitchen', name: 'Kitchen'}, {id: 'bar', name: 'Bar'}];
 
-  if (!bills || !categories) return { bar: [], kitchen: [], barTotal: 0, kitchenTotal: 0, barQty: 0, kitchenQty: 0, barLabel, kitchenLabel };
+  if (!bills || !categories) return { departments: [] };
   
   const allItems = [];
   bills.forEach(bill => (bill.items || []).forEach(item => {
@@ -419,20 +416,29 @@ export function getSplitReport(bills, categories, config = {}) {
     }
   }));
 
-  const bar = isBarEnabled ? allItems.filter(i => i.categoryType !== 'kitchen').sort((a,b) => b.qty - a.qty) : [];
-  const kitchen = isKitchenEnabled ? allItems.filter(i => i.categoryType === 'kitchen').sort((a,b) => b.qty - a.qty) : [];
+  const departments = depts.map(dept => {
+    // Find categories for this dept
+    const deptCatIds = categories.filter(c => c.type === dept.id).map(c => c.id);
+    
+    // Group items. Note: bill items have `categoryType` (string) and we can match by it if needed,
+    // but originally they also had `categoryId` if populated. Often we just match categoryType = dept.id.
+    const items = allItems.filter(i => {
+      // support legacy 'bar' / 'kitchen' strings, or categoryId mapping
+      if (i.categoryType === dept.id) return true;
+      if (deptCatIds.includes(i.categoryId)) return true;
+      if (!i.categoryType && !i.categoryId) return dept.id === 'bar'; // legacy logic
+      return false;
+    }).sort((a,b) => b.qty - a.qty);
+    
+    const qty = items.reduce((s,i) => s + i.qty, 0);
+    const revenue = items.reduce((s,i) => s + i.revenue, 0);
+    
+    return {
+      id: dept.id, name: dept.name, items, qty, revenue
+    };
+  });
   
-  return {
-    bar, kitchen,
-    barTotal: bar.reduce((s,i) => s + i.revenue, 0),
-    kitchenTotal: kitchen.reduce((s,i) => s + i.revenue, 0),
-    barQty: bar.reduce((s,i) => s + i.qty, 0),
-    kitchenQty: kitchen.reduce((s,i) => s + i.qty, 0),
-    barLabel,
-    kitchenLabel,
-    isBarEnabled,
-    isKitchenEnabled
-  };
+  return { departments };
 }
 
 export function getSessionBills(session, bills) {
@@ -550,3 +556,4 @@ export async function injectFakeData() {
     await addTable({ sectionId: s2.id, number: i, label: `V${i}`, status: 'available' });
   }
 }
+

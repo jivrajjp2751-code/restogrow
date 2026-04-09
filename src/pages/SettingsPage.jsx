@@ -56,68 +56,32 @@ export default function SettingsPage() {
       <div className="config-section">
         <h3 className="config-section-title">🏢 DEPARTMENTS</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '12px' }}>
-          Enable or disable service areas and customize their names (e.g. rename 'Bar' to 'Cafe').
+          Add or remove service areas like Kitchen, Bar, Shisha Lounge, etc.
         </p>
-        <div className="config-grid">
-           <div className="input-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
-             <input type="checkbox" checked={form.isKitchenEnabled !== false} onChange={e => setForm(f => ({ ...f, isKitchenEnabled: e.target.checked }))} />
-             <label className="input-label" style={{ marginBottom: 0 }}>Enable Kitchen</label>
-           </div>
-           <div className="input-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
-             <input type="checkbox" checked={form.isBarEnabled !== false} onChange={e => setForm(f => ({ ...f, isBarEnabled: e.target.checked }))} />
-             <label className="input-label" style={{ marginBottom: 0 }}>Enable Bar/Cafe</label>
-           </div>
-           
-           <div className="input-group">
-             <label className="input-label">Kitchen Label</label>
-             <input className="input" value={form.kitchenLabel || 'Kitchen'} onChange={e => setForm(f => ({ ...f, kitchenLabel: e.target.value }))} disabled={form.isKitchenEnabled === false} />
-           </div>
-           <div className="input-group">
-             <label className="input-label">Bar/Cafe Label</label>
-             <input className="input" value={form.barLabel || 'Bar'} onChange={e => setForm(f => ({ ...f, barLabel: e.target.value }))} disabled={form.isBarEnabled === false} />
-           </div>
+        <div className="config-grid" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}]).map((dept, idx) => (
+             <div key={dept.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
+               <input className="input" value={dept.name} onChange={e => {
+                  const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
+                  newDepts[idx].name = e.target.value;
+                  setForm(f => ({ ...f, departments: newDepts }));
+               }} />
+               <button className="btn btn-ghost" style={{ color: 'var(--brand-danger)' }} onClick={() => {
+                  const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
+                  newDepts.splice(idx, 1);
+                  setForm(f => ({ ...f, departments: newDepts }));
+               }}>X</button>
+             </div>
+          ))}
+          <button className="btn btn-secondary btn-sm" onClick={() => {
+             const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
+             newDepts.push({ id: 'dept_' + Date.now(), name: 'New Dept' });
+             setForm(f => ({ ...f, departments: newDepts }));
+          }}>+ ADD DEPARTMENT</button>
         </div>
       </div>
 
-      <div className="config-section">
-        <h3 className="config-section-title">✨ DEMO & ONBOARDING</h3>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '8px' }}>
-          Generate a full set of sample Categories, Menu Items, Sections, and Tables to preview the system instantly.
-        </p>
-        <button 
-          className="btn btn-primary" 
-          onClick={async () => {
-             try {
-                await injectFakeData();
-                refresh();
-                addToast('Demo data successfully generated!', 'success');
-             } catch(e) {
-                addToast(e.message, 'error');
-             }
-          }}
-        >
-          GENERATE SAMPLE DATA
-        </button>
-      </div>
 
-      <div className="config-section">
-        <h3 className="config-section-title">🛠️ DIAGNOSTICS</h3>
-        <button 
-          className="btn btn-secondary" 
-          onClick={async () => {
-             try {
-               const { supabase } = await import('../utils/supabase');
-               const { data: o } = await supabase.from('order_items').select('*').limit(1);
-               const { data: b } = await supabase.from('bill_items').select('*').limit(1);
-               const { data: inv } = await supabase.from('inventory_log').select('*').limit(1);
-               const msg = `order_items: ${o ? Object.keys(o[0] || {}) : 'none'}\n\nbill_items: ${b ? Object.keys(b[0] || {}) : 'none'}\n\ninventory: ${inv ? Object.keys(inv[0] || {}) : 'none'}`;
-               alert(msg);
-             } catch (e) { alert(e.message); }
-          }}
-        >
-          CHECK DATABASE SCHEMA
-        </button>
-      </div>
 
       <div className="config-section" style={{ borderColor: 'rgba(255,107,107,0.3)' }}>
         <h3 className="config-section-title" style={{ color: 'var(--brand-danger)' }}><RefreshCw size={14} /> DANGER ZONE</h3>

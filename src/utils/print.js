@@ -15,53 +15,28 @@ export function printBillDirect(bill) {
  * This is the main KOT function used from mobile/staff
  * Returns { kitchenKOT: bool, barKOT: bool }
  */
-export function printSplitKOT(order, tableNumber, categories = []) {
-  const getCatType = (item) => item.categoryType || 'bar';
-  const kitchenItems = (order?.items || []).filter(i => getCatType(i) === 'kitchen');
-  const barItems = (order?.items || []).filter(i => getCatType(i) !== 'kitchen');
-
-  const result = { kitchenKOT: false, barKOT: false };
-
-  if (kitchenItems.length > 0) {
-    const kitchenOrder = { ...order, items: kitchenItems };
-    const html = buildKitchenKOTHTML(kitchenOrder, tableNumber);
-    silentPrint(html);
-    result.kitchenKOT = true;
-  }
-
-  if (barItems.length > 0) {
-    const barOrder = { ...order, items: barItems };
-    const html = buildBarKOTHTML(barOrder, tableNumber);
-    // Slight delay so browser can handle two print dialogs
-    setTimeout(() => silentPrint(html), kitchenItems.length > 0 ? 1500 : 0);
-    result.barKOT = true;
-  }
-
-  return result;
-}
-
-/**
- * Print only Kitchen KOT (admin/counter use)
- */
-export function printKitchenKOT(order, tableNumber, categories = []) {
-  const getCatType = (item) => item.categoryType || 'bar';
-  const kitchenItems = order.items.filter(i => getCatType(i) === 'kitchen');
-  if (kitchenItems.length === 0) return false;
-  const kitchenOrder = { ...order, items: kitchenItems };
-  silentPrint(buildKitchenKOTHTML(kitchenOrder, tableNumber));
-  return true;
-}
-
-/**
- * Print only Bar KOT (admin/counter use)
- */
-export function printBarKOT(order, tableNumber, categories = []) {
-  const getCatType = (item) => item.categoryType || 'bar';
-  const barItems = order.items.filter(i => getCatType(i) !== 'kitchen');
-  if (barItems.length === 0) return false;
-  const barOrder = { ...order, items: barItems };
-  silentPrint(buildBarKOTHTML(barOrder, tableNumber));
-  return true;
+export function printSplitKOT(order, tableNumber, categories = [], config = {}) {
+  const departments = config.departments || [{id: 'kitchen', name: 'Kitchen'}, {id: 'bar', name: 'Bar'}];
+  
+  let printedCount = 0;
+  
+  departments.forEach((dept, index) => {
+    // Find all category IDs for this department
+    const deptCatIds = categories.filter(c => c.type === dept.id).map(c => c.id);
+    // Find all items in this order that belong to those categories
+    const deptItems = (order?.items || []).filter(i => deptCatIds.includes(i.categoryId));
+    
+    if (deptItems.length > 0) {
+      const deptOrder = { ...order, items: deptItems };
+      const html = buildDeptKOTHTML(deptOrder, tableNumber, dept);
+      
+      // Delay prints slightly to prevent browser dropping them
+      setTimeout(() => silentPrint(html), printedCount * 1500);
+      printedCount++;
+    }
+  });
+  
+  return { success: printedCount > 0 };
 }
 
 /**
@@ -120,14 +95,14 @@ const kotStyles = `
   .item-row:last-child { border-bottom: none; }
 `;
 
-// ===== KITCHEN KOT =====
-function buildKitchenKOTHTML(order, tableNumber) {
+// ===== DEPARTMENT KOT =====
+function buildDeptKOTHTML(order, tableNumber, dept) {
   return `<!DOCTYPE html>
-<html><head><title>KITCHEN KOT - T${tableNumber}</title>
+<html><head><title>${dept.name.toUpperCase()} KOT - T${tableNumber}</title>
 <style>${kotStyles}</style></head><body>
 
 <h2>*** KOT ***</h2>
-<div class="type-label">🍽️ KITCHEN</div>
+<div class="type-label">${dept.name.toUpperCase()}</div>
 
 <div class="dash"></div>
 
@@ -150,43 +125,7 @@ ${(order.items || []).map(i => `
 
 <div class="center meta" style="margin-top:4px">
   <p style="font-size:12px;font-weight:bold">Total Items: ${order.items.reduce((s, i) => s + i.quantity, 0)}</p>
-  <p style="margin-top:6px">--- KITCHEN KOT END ---</p>
-</div>
-
-</body></html>`;
-}
-
-// ===== BAR KOT =====
-function buildBarKOTHTML(order, tableNumber) {
-  return `<!DOCTYPE html>
-<html><head><title>BAR KOT - T${tableNumber}</title>
-<style>${kotStyles}</style></head><body>
-
-<h2>*** KOT ***</h2>
-<div class="type-label">🍸 BAR</div>
-
-<div class="dash"></div>
-
-<div class="row">
-  <span><b>TABLE ${tableNumber}</b></span>
-  <span class="meta">${new Date().toLocaleTimeString()}</span>
-</div>
-<div class="meta">${new Date().toLocaleDateString()}</div>
-
-<div class="dash"></div>
-
-${(order.items || []).map(i => `
-<div class="item-row">
-  <div class="row"><span><b>${i.quantity}×</b> ${i.name}</span></div>
-  ${i.note ? `<div class="note">→ ${i.note}</div>` : ''}
-</div>
-`).join('')}
-
-<div class="dash"></div>
-
-<div class="center meta" style="margin-top:4px">
-  <p style="font-size:12px;font-weight:bold">Total Items: ${order.items.reduce((s, i) => s + i.quantity, 0)}</p>
-  <p style="margin-top:6px">--- BAR KOT END ---</p>
+  <p style="margin-top:6px">--- END KOT ---</p>
 </div>
 
 </body></html>`;

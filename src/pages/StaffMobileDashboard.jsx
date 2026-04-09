@@ -7,7 +7,7 @@ import {
 import { printSplitKOT, printBillDirect } from '../utils/print';
 import {
   Search, Plus, Minus, Trash2, ArrowLeft, Printer, Wine, Coffee,
-  X, StickyNote, LogOut, Receipt, CreditCard, Banknote, Smartphone, RefreshCw
+  X, StickyNote, LogOut, Receipt, CreditCard, Banknote, Smartphone, RefreshCw, Package
 } from 'lucide-react';
 
 export default function StaffMobileDashboard() {
@@ -16,7 +16,8 @@ export default function StaffMobileDashboard() {
 
   const [selectedTableId, setSelectedTableId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeMenuTab, setActiveMenuTab] = useState('bar');
+  const depts = useMemo(() => config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}], [config]);
+  const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id || 'kitchen');
   const [activeCategory, setActiveCategory] = useState('all');
   const [noteModal, setNoteModal] = useState(null);
   const [noteText, setNoteText] = useState('');
@@ -50,18 +51,16 @@ export default function StaffMobileDashboard() {
 
   const safeItems = order?.items || [];
 
-  const barCategories = useMemo(() => (categories || []).filter(c => c.type === 'bar'), [categories]);
-  const kitchenCategories = useMemo(() => (categories || []).filter(c => c.type === 'kitchen'), [categories]);
+  const deptCategories = useMemo(() => (categories || []).filter(c => c.type === activeDeptId), [categories, activeDeptId]);
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    const tabCats = activeMenuTab === 'bar' ? barCategories : kitchenCategories;
-    const tabCatIds = tabCats.map(c => c.id);
+    const tabCatIds = deptCategories.map(c => c.id);
     let items = (menuItems || []).filter(i => tabCatIds.includes(i.categoryId));
     if (activeCategory !== 'all') items = items.filter(i => i.categoryId === activeCategory);
     if (q) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
     return items;
-  }, [menuItems, activeMenuTab, activeCategory, searchQuery, barCategories, kitchenCategories]);
+  }, [menuItems, activeDeptId, activeCategory, searchQuery, deptCategories]);
 
   const handleTableClick = (table) => {
     if (!currentSession) { addToast('Start a session first!', 'warning'); return; }
@@ -167,11 +166,8 @@ export default function StaffMobileDashboard() {
     if (!order || safeItems.length === 0) { addToast('No items to print', 'warning'); return; }
     try {
       const tableLabel = selectedTable?.label || selectedTable?.number;
-      const result = printSplitKOT(order, tableLabel, categories);
-      if (result?.kitchenKOT && result?.barKOT) addToast('Kitchen KOT + Bar KOT printed', 'success');
-      else if (result?.kitchenKOT) addToast('Kitchen KOT printed', 'success');
-      else if (result?.barKOT) addToast('Bar KOT printed', 'success');
-      else addToast('KOT sent', 'success');
+      printSplitKOT(order, tableLabel, categories, config);
+      addToast('KOT printed', 'success');
     } catch (e) { addToast('Print failed: ' + (e.message || ''), 'error'); }
   };
 
@@ -200,8 +196,7 @@ export default function StaffMobileDashboard() {
   const discountAmt = (subtotal * discount) / 100;
   const total = subtotal + tax + serviceCharge - discountAmt;
 
-  const barOrderItems = safeItems.filter(i => i.categoryType !== 'kitchen');
-  const kitchenOrderItems = safeItems.filter(i => i.categoryType === 'kitchen');
+
 
   // ===== TABLE VIEW =====
   if (!selectedTableId) {
@@ -295,8 +290,7 @@ export default function StaffMobileDashboard() {
     );
   }
 
-  // ===== ORDER VIEW =====
-  const activeCats = activeMenuTab === 'bar' ? barCategories : kitchenCategories;
+
 
   return (
     <div className="staff-mobile">
@@ -324,20 +318,18 @@ export default function StaffMobileDashboard() {
             <span className="staff-order-total">{config.currency}{subtotal}</span>
           </div>
           <div className="staff-order-items-list">
-            {barOrderItems.length > 0 && (
-              <>
-                <div className="staff-order-section-label bar"><Wine size={12} /> BAR ({barOrderItems.length})</div>
-                {barOrderItems.map(item => <OrderItemRow key={item.id} item={item} config={config} busy={busy}
-                  onQty={handleQtyChange} onRemove={handleRemoveItem} onNote={(it) => { setNoteModal(it); setNoteText(it.note || ''); }} />)}
-              </>
-            )}
-            {kitchenOrderItems.length > 0 && (
-              <>
-                <div className="staff-order-section-label kitchen"><Coffee size={12} /> KITCHEN ({kitchenOrderItems.length})</div>
-                {kitchenOrderItems.map(item => <OrderItemRow key={item.id} item={item} config={config} busy={busy}
-                  onQty={handleQtyChange} onRemove={handleRemoveItem} onNote={(it) => { setNoteModal(it); setNoteText(it.note || ''); }} />)}
-              </>
-            )}
+            {depts.map(dept => {
+               const deptCatIds = categories.filter(c => c.type === dept.id).map(c => c.id);
+               const deptOrderItems = safeItems.filter(i => deptCatIds.includes(i.categoryId));
+               if (deptOrderItems.length === 0) return null;
+               return (
+                 <div key={dept.id}>
+                   <div className="staff-order-section-label"><Package size={12} /> {dept.name.toUpperCase()} ({deptOrderItems.length})</div>
+                   {deptOrderItems.map(item => <OrderItemRow key={item.id} item={item} config={config} busy={busy}
+                     onQty={handleQtyChange} onRemove={handleRemoveItem} onNote={(it) => { setNoteModal(it); setNoteText(it.note || ''); }} />)}
+                 </div>
+               );
+            })}
           </div>
         </div>
         <div style={{ padding: '0 12px 12px 12px' }}>
@@ -354,21 +346,19 @@ export default function StaffMobileDashboard() {
         {searchQuery && <button className="staff-search-clear" onClick={() => setSearchQuery('')}><X size={14} /></button>}
       </div>
 
-      <div className="staff-menu-toggle">
-        <button className={`staff-toggle-btn ${activeMenuTab === 'bar' ? 'active bar' : ''}`}
-          onClick={() => { setActiveMenuTab('bar'); setActiveCategory('all'); }}>
-          <Wine size={14} /> BAR
-        </button>
-        <button className={`staff-toggle-btn ${activeMenuTab === 'kitchen' ? 'active kitchen' : ''}`}
-          onClick={() => { setActiveMenuTab('kitchen'); setActiveCategory('all'); }}>
-          <Coffee size={14} /> KITCHEN
-        </button>
+      <div className="staff-menu-toggle" style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
+        {depts.map(dept => (
+          <button key={dept.id} className={`staff-toggle-btn ${activeDeptId === dept.id ? 'active' : ''}`}
+            onClick={() => { setActiveDeptId(dept.id); setActiveCategory('all'); }}>
+            {dept.name.toUpperCase()}
+          </button>
+        ))}
       </div>
 
       <div className="staff-category-scroll">
         <button className={`staff-cat-tab ${activeCategory === 'all' ? 'active' : ''}`}
           onClick={() => setActiveCategory('all')}>ALL</button>
-        {activeCats.map(cat => (
+        {deptCategories.map(cat => (
           <button key={cat.id} className={`staff-cat-tab ${activeCategory === cat.id ? 'active' : ''}`}
             onClick={() => setActiveCategory(cat.id)}>{cat.icon} {cat.name}</button>
         ))}

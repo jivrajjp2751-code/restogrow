@@ -23,25 +23,10 @@ export default function InventoryPage() {
   const lowStockItems = getLowStockItems(menuItems);
   const inventoryLog = getInventoryLog(inventory_log).reverse().slice(0, 50);
 
-  const isKitchenEnabled = config.isKitchenEnabled !== false;
-  const isBarEnabled = config.isBarEnabled !== false;
-  const barLabel = config.barLabel || 'Bar';
-  const kitchenLabel = config.kitchenLabel || 'Kitchen';
-
-  // Classify categories
-  const barCats = categories.filter(c => c.type === 'bar');
-  const kitchenCats = categories.filter(c => c.type === 'kitchen');
-  const barCatIds = barCats.map(c => c.id);
-  const kitchenCatIds = kitchenCats.map(c => c.id);
-
   // Filter by search across all items
   const searchFiltered = menuItems.filter(i =>
     !searchQuery || i.name?.toLowerCase().includes(searchQuery.toLowerCase()) || i.code?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const barItems = isBarEnabled ? searchFiltered.filter(i => barCatIds.includes(i.categoryId)) : [];
-  const kitchenItems = isKitchenEnabled ? searchFiltered.filter(i => kitchenCatIds.includes(i.categoryId)) : [];
-  const uncategorized = isBarEnabled ? searchFiltered.filter(i => !barCatIds.includes(i.categoryId) && !kitchenCatIds.includes(i.categoryId)) : [];
 
   const handleAddStock = async () => {
     if (!stockModal || !addQty || Number(addQty) <= 0) { addToast('Enter valid qty', 'error'); return; }
@@ -54,14 +39,14 @@ export default function InventoryPage() {
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
   };
 
-  const openAddItem = (type) => {
-    const typeCats = type === 'bar' ? barCats : kitchenCats;
+  const openAddItem = (deptId) => {
+    const deptCats = categories.filter(c => c.type === deptId);
     setNewItemForm({
       name: '', code: `ITM${Date.now().toString().slice(-4)}`,
-      price: '', categoryId: typeCats[0]?.id || '',
-      stock: '50', unit: type === 'bar' ? 'bottle' : 'plate', isVeg: true,
+      price: '', categoryId: deptCats[0]?.id || '',
+      stock: '50', unit: deptId === 'bar' ? 'bottle' : 'plate', isVeg: true,
     });
-    setAddItemModal(type);
+    setAddItemModal(deptId);
   };
 
   const handleAddNewItem = async () => {
@@ -157,39 +142,7 @@ export default function InventoryPage() {
     </table>
   );
 
-  // Render category list for a type
-  const renderCategoryList = (type) => {
-    const cats = type === 'bar' ? barCats : kitchenCats;
-    return (
-      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '6px 8px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
-        {cats.map(cat => (
-          <div key={cat.id} style={{
-            display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px',
-            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-sm)', fontSize: '10px',
-          }}>
-            <span>{cat.icon}</span>
-            <span style={{ fontWeight: 600 }}>{cat.name}</span>
-            {isAdmin && (
-              <>
-                <button className="btn btn-ghost" style={{ padding: '1px', minHeight: 0 }} onClick={() => openCatEdit(cat)}>
-                  <Edit3 size={9} />
-                </button>
-                <button className="btn btn-ghost" style={{ padding: '1px', minHeight: 0, color: 'var(--brand-danger)' }} onClick={() => handleDeleteCat(cat.id)}>
-                  <Trash2 size={9} />
-                </button>
-              </>
-            )}
-          </div>
-        ))}
-        {isAdmin && (
-          <button className="btn btn-sm btn-ghost" style={{ fontSize: '10px', padding: '3px 6px' }} onClick={() => openCatNew(type)}>
-            <Plus size={9} /> Add
-          </button>
-        )}
-      </div>
-    );
-  };
+
 
   return (
     <div className="page-content">
@@ -226,65 +179,63 @@ export default function InventoryPage() {
             <input className="input" placeholder="Search bar & kitchen items..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
 
-          {/* Horizontal split: BAR | KITCHEN */}
           <div className="inventory-split-container" style={{ 
             display: 'grid', 
-            gridTemplateColumns: isBarEnabled && isKitchenEnabled ? '1fr 1fr' : '1fr', 
+            gridTemplateColumns: `repeat(${Math.min(3, (config.departments || [{id:'k'},{id:'b'}]).length || 1)}, 1fr)`, 
             gap: '12px' 
           }}>
-            {/* BAR ITEMS SECTION */}
-            {isBarEnabled && (
-              <div className="inventory-section">
-                <div className="inventory-section-header bar">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Wine size={16} />
-                    <span className="inventory-section-title">{barLabel.toUpperCase()} ITEMS</span>
-                    <span className="badge badge-info">{barItems.length + uncategorized.length}</span>
+            {(config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}]).map(dept => {
+              const deptCats = categories.filter(c => c.type === dept.id);
+              const deptCatIds = deptCats.map(c => c.id);
+              const deptItems = searchFiltered.filter(i => deptCatIds.includes(i.categoryId));
+              return (
+                <div key={dept.id} className="inventory-section">
+                  <div className="inventory-section-header" style={{ background: 'var(--bg-tertiary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Package size={16} />
+                      <span className="inventory-section-title">{dept.name.toUpperCase()} ITEMS</span>
+                      <span className="badge badge-info">{deptItems.length}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                        {deptItems.filter(i => i.stock <= 10).length} low
+                      </span>
+                      {isAdmin && (
+                        <button className="btn btn-sm btn-success" onClick={() => openAddItem(dept.id)}>
+                          <PlusCircle size={10} /> ADD
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                      {(barItems.concat(uncategorized)).filter(i => i.stock <= 10).length} low
-                    </span>
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '6px 8px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
+                    {deptCats.map(cat => (
+                      <div key={cat.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px',
+                        background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-sm)', fontSize: '10px',
+                      }}>
+                        <span>{cat.icon}</span>
+                        <span style={{ fontWeight: 600 }}>{cat.name}</span>
+                        {isAdmin && (
+                          <>
+                            <button className="btn btn-ghost" style={{ padding: '1px', minHeight: 0 }} onClick={() => openCatEdit(cat)}><Edit3 size={9} /></button>
+                            <button className="btn btn-ghost" style={{ padding: '1px', minHeight: 0, color: 'var(--brand-danger)' }} onClick={() => handleDeleteCat(cat.id)}><Trash2 size={9} /></button>
+                          </>
+                        )}
+                      </div>
+                    ))}
                     {isAdmin && (
-                      <button className="btn btn-sm btn-success" onClick={() => openAddItem('bar')}>
-                        <PlusCircle size={10} /> ADD
+                      <button className="btn btn-sm btn-ghost" style={{ fontSize: '10px', padding: '3px 6px' }} onClick={() => openCatNew(dept.id)}>
+                        <Plus size={9} /> Add
                       </button>
                     )}
                   </div>
-                </div>
-                {renderCategoryList('bar')}
-                <div className="inventory-section-body">
-                  {renderStockTable([...barItems, ...uncategorized], searchQuery ? 'No items match' : 'No items')}
-                </div>
-              </div>
-            )}
-
-            {/* KITCHEN ITEMS SECTION */}
-            {isKitchenEnabled && (
-              <div className="inventory-section">
-                <div className="inventory-section-header kitchen">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Coffee size={16} />
-                    <span className="inventory-section-title">{kitchenLabel.toUpperCase()} ITEMS</span>
-                    <span className="badge badge-warning">{kitchenItems.length}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                      {kitchenItems.filter(i => i.stock <= 10).length} low
-                    </span>
-                    {isAdmin && (
-                      <button className="btn btn-sm btn-success" onClick={() => openAddItem('kitchen')}>
-                        <PlusCircle size={10} /> ADD
-                      </button>
-                    )}
+                  <div className="inventory-section-body">
+                    {renderStockTable(deptItems, searchQuery ? 'No items match' : 'No items')}
                   </div>
                 </div>
-                {renderCategoryList('kitchen')}
-                <div className="inventory-section-body">
-                  {renderStockTable(kitchenItems, searchQuery ? 'No items match' : 'No items')}
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         </>
       )}
@@ -360,7 +311,7 @@ export default function InventoryPage() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">
-                ADD {addItemModal === 'bar' ? barLabel.toUpperCase() : kitchenLabel.toUpperCase()} ITEM
+                ADD ITEM
               </h3>
               <button className="btn btn-ghost btn-icon" onClick={() => setAddItemModal(null)}>✕</button>
             </div>
@@ -388,7 +339,7 @@ export default function InventoryPage() {
                   <label className="input-label">Category</label>
                   <select className="select" value={newItemForm.categoryId}
                     onChange={e => setNewItemForm(f => ({ ...f, categoryId: e.target.value }))}>
-                    {(addItemModal === 'bar' ? barCats : kitchenCats).map(c => (
+                    {categories.filter(c => c.type === addItemModal).map(c => (
                       <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
                     ))}
                   </select>
@@ -449,10 +400,11 @@ export default function InventoryPage() {
                 <input className="input" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} autoFocus /></div>
               <div className="input-group"><label className="input-label">Icon (Emoji)</label>
                 <input className="input" value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} /></div>
-              <div className="input-group"><label className="input-label">Type</label>
+              <div className="input-group"><label className="input-label">Type (Department)</label>
                 <select className="select" value={catForm.type} onChange={e => setCatForm(f => ({ ...f, type: e.target.value }))}>
-                  <option value="bar">{barLabel}</option>
-                  <option value="kitchen">{kitchenLabel}</option>
+                  {(config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}]).map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
                 </select></div>
               <div className="input-group"><label className="input-label">Color</label>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

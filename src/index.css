@@ -1970,3 +1970,101 @@ ul, ol { list-style: none; }
   gap: 8px;
 }
 
+/* ===== MOBILE ADMIN LAYOUT FIX ===== */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw !important;
+    min-width: 100vw !important;
+    height: 64px;
+    flex-direction: row;
+    justify-content: space-around;
+    padding: 0 8px !important;
+    border-right: none !important;
+    border-top: 2px solid var(--border-color);
+    background: var(--bg-card);
+    z-index: 1000;
+  }
+  .sidebar-brand-icon { display: none; }
+  .sidebar-nav {
+    flex-direction: row !important;
+    width: 100%;
+    height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-items: center;
+    justify-content: space-around;
+  }
+  .sidebar-link {
+    width: auto !important;
+    height: 100% !important;
+    flex-direction: column;
+    padding: 6px 12px !important;
+    gap: 2px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+  .sidebar-link.active {
+    color: var(--brand-primary);
+    border-top: 3px solid var(--brand-primary);
+  }
+  .sidebar-link span { display: block !important; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+  .sidebar-footer { display: none; }
+  
+  .app-layout {
+    flex-direction: column !important;
+  }
+  .main-content {
+    flex: 1;
+    overflow-y: auto;
+    height: calc(100vh - 64px);
+    padding: 12px !important;
+  }
+
+  /* Admin Page Refinements */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+  .page-title { font-size: 16px; }
+  
+  .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .inventory-split-container {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .order-layout {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 88px);
+    gap: 0;
+  }
+  .menu-panel { 
+    height: 60vh; 
+    border-right: none;
+    padding-bottom: 20px;
+  }
+  .order-panel { 
+    height: 40vh; 
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+  }
+  
+  /* Tables/Grid refinements */
+  .table-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+  }
+  .table-card { padding: 10px !important; }
+
+  /* Modals on mobile */
+  .modal {
+    width: 95% !important;
+    max-height: 90vh;
+  }
+}

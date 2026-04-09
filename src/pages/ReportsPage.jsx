@@ -51,18 +51,20 @@ export default function ReportsPage() {
   // Monthly most sold liquor
   const mostSoldLiquor = reportType === 'monthly' ? getMostSoldLiquor(selectedMonth, bills, categories) : [];
 
-  // Category Breakdown
+  // Category Breakdown - fallback to 'Uncategorized' if no match
   const categorySales = {};
   filteredBills.forEach(bill => {
     (bill.items || []).forEach(item => {
-      // bill_items only have categoryType, not categoryId
-      const catType = item.categoryType || 'bar';
-      const isKit = catType === 'kitchen';
-      const catName = isKit ? splitReport.kitchenLabel : splitReport.barLabel;
-      const catColor = isKit ? '#FDCB6E' : '#6C5CE7';
-      if (!categorySales[catName]) categorySales[catName] = { qty: 0, revenue: 0, color: catColor, type: catType };
-      categorySales[catName].qty += (item.quantity || 0);
-      categorySales[catName].revenue += (item.price || 0) * (item.quantity || 0);
+      let deptName = 'Uncategorized';
+      let deptColor = '#ccc';
+      splitReport.departments?.forEach(d => {
+         if (item.categoryType === d.id || (d.items && d.items.find(i => i.name === item.name))) {
+            deptName = d.name;
+         }
+      });
+      if (!categorySales[deptName]) categorySales[deptName] = { qty: 0, revenue: 0, color: deptColor };
+      categorySales[deptName].qty += (item.quantity || 0);
+      categorySales[deptName].revenue += (item.price || 0) * (item.quantity || 0);
     });
   });
   const categoryData = Object.entries(categorySales).sort((a,b) => b[1].revenue - a[1].revenue);
@@ -109,28 +111,19 @@ ${config.address ? `<div class="c" style="font-size:10px">${config.address}</div
 <div class="d"></div>
 
 <h3>Sales Summary</h3>
-${splitReport.isBarEnabled ? `<div class="r"><span>${splitReport.barLabel}: ${splitReport.barQty} items</span><span>${config.currency}${splitReport.barTotal}</span></div>` : ''}
-${splitReport.isKitchenEnabled ? `<div class="r"><span>${splitReport.kitchenLabel}: ${splitReport.kitchenQty} items</span><span>${config.currency}${splitReport.kitchenTotal}</span></div>` : ''}
+${(splitReport.departments || []).map(d => `<div class="r"><span>${d.name}: ${d.qty} items</span><span>${config.currency}${d.revenue}</span></div>`).join('')}
 <div class="d"></div>
 
-${splitReport.isBarEnabled ? `
-<div class="section-title">${splitReport.barLabel.toUpperCase()} ITEMS</div>
+${(splitReport.departments || []).map(d => `
+<div class="section-title">${d.name.toUpperCase()} ITEMS</div>
 <table>
 <tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th></tr>
-${splitReport.bar.map(i => `<tr><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
-<tr class="total-row"><td>${splitReport.barLabel.toUpperCase()} TOTAL</td><td style="text-align:center">${splitReport.barQty}</td><td style="text-align:right">${config.currency}${splitReport.barTotal}</td></tr>
-</table>` : ''}
+${d.items.map(i => `<tr><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
+<tr class="total-row"><td>${d.name.toUpperCase()} TOTAL</td><td style="text-align:center">${d.qty}</td><td style="text-align:right">${config.currency}${d.revenue}</td></tr>
+</table>`).join('')}
 
-${splitReport.isKitchenEnabled ? `
-<div class="section-title">${splitReport.kitchenLabel.toUpperCase()} ITEMS</div>
-<table>
-<tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th></tr>
-${splitReport.kitchen.map(i => `<tr><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
-<tr class="total-row"><td>${splitReport.kitchenLabel.toUpperCase()} TOTAL</td><td style="text-align:center">${splitReport.kitchenQty}</td><td style="text-align:right">${config.currency}${splitReport.kitchenTotal}</td></tr>
-</table>` : ''}
-
-${reportType === 'monthly' && mostSoldLiquor.length > 0 && splitReport.isBarEnabled ? `
-<div class="section-title">🏆 MOST SOLD ${splitReport.barLabel.toUpperCase()} (${reportLabel})</div>
+${reportType === 'monthly' && mostSoldLiquor.length > 0 ? `
+<div class="section-title">🏆 TOP SELLING ITEMS (${reportLabel})</div>
 <table>
 <tr><th>#</th><th>Item</th><th style="text-align:center">Qty Sold</th><th style="text-align:right">Revenue</th></tr>
 ${mostSoldLiquor.slice(0, 20).map((i, idx) => `<tr><td>${idx + 1}</td><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
@@ -242,24 +235,17 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
 
           {/* Bar vs Kitchen Split */}
           <div className="card">
-            <div className="card-header"><span className="card-title">{splitReport.barLabel.toUpperCase()} vs {splitReport.kitchenLabel.toUpperCase()}</span></div>
+            <div className="card-header"><span className="card-title">DEPARTMENT SALES</span></div>
             <div className="card-body" style={{ padding: '0 12px' }}>
               <table className="data-table" style={{ marginBottom: '8px' }}>
                 <tbody>
-                  {splitReport.isBarEnabled && (
-                    <tr>
-                      <td style={{ fontWeight: 600 }}><Wine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{splitReport.barLabel.toUpperCase()}</td>
-                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{splitReport.barQty} items</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{splitReport.barTotal}</td>
+                  {(splitReport.departments || []).map(d => (
+                    <tr key={d.id}>
+                      <td style={{ fontWeight: 600 }}><PieChart size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{d.name.toUpperCase()}</td>
+                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{d.qty} items</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{d.revenue}</td>
                     </tr>
-                  )}
-                  {splitReport.isKitchenEnabled && (
-                    <tr>
-                      <td style={{ fontWeight: 600 }}><Coffee size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{splitReport.kitchenLabel.toUpperCase()}</td>
-                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{splitReport.kitchenQty} items</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-warning)' }}>{config.currency}{splitReport.kitchenTotal}</td>
-                    </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -291,18 +277,17 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
 
         {/* Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Bar Items Detail */}
-          {splitReport.isBarEnabled && (
-            <div className="card">
+          {(splitReport.departments || []).map(d => (
+            <div key={d.id} className="card">
               <div className="card-header">
-                <span className="card-title"><Wine size={12} style={{ display: 'inline', marginRight: '6px' }} />{splitReport.barLabel.toUpperCase()} ITEMS SOLD</span>
-                <span className="badge badge-info">{splitReport.barQty} qty · {config.currency}{splitReport.barTotal}</span>
+                <span className="card-title"><PieChart size={12} style={{ display: 'inline', marginRight: '6px' }} />{d.name.toUpperCase()} ITEMS SOLD</span>
+                <span className="badge badge-info">{d.qty} qty · {config.currency}{d.revenue}</span>
               </div>
               <div className="card-body" style={{ padding: 0, maxHeight: '250px', overflow: 'auto' }}>
                 <table className="data-table">
                   <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>SOLD</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
                   <tbody>
-                    {splitReport.bar.length > 0 ? splitReport.bar.map((item, idx) => (
+                    {d.items && d.items.length > 0 ? d.items.map((item, idx) => (
                       <tr key={item.name}>
                         <td>
                           <span style={{ display: 'inline-block', width: '16px', color: 'var(--text-tertiary)', fontSize: '10px' }}>{idx+1}.</span>
@@ -311,60 +296,31 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
                         <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
                       </tr>
-                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No {splitReport.barLabel} items sold</td></tr>}
+                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No items sold</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
-          )}
+          ))}
 
-          {/* Kitchen Items Detail */}
-          {splitReport.isKitchenEnabled && (
+          {/* Top Selling Items (Monthly Only) */}
+          {reportType === 'monthly' && mostSoldLiquor.length > 0 && (
             <div className="card">
               <div className="card-header">
-                <span className="card-title"><Coffee size={12} style={{ display: 'inline', marginRight: '6px' }} />{splitReport.kitchenLabel.toUpperCase()} ITEMS SOLD</span>
-                <span className="badge badge-warning">{splitReport.kitchenQty} qty · {config.currency}{splitReport.kitchenTotal}</span>
-              </div>
-              <div className="card-body" style={{ padding: 0, maxHeight: '200px', overflow: 'auto' }}>
-                <table className="data-table">
-                  <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>SOLD</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
-                  <tbody>
-                    {splitReport.kitchen.length > 0 ? splitReport.kitchen.map((item, idx) => (
-                      <tr key={item.name}>
-                        <td>
-                          <span style={{ display: 'inline-block', width: '16px', color: 'var(--text-tertiary)', fontSize: '10px' }}>{idx+1}.</span>
-                          <span style={{ fontWeight: 600 }}>{item.name}</span>
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
-                      </tr>
-                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No {splitReport.kitchenLabel} items sold</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Most Sold Liquor (Monthly Only) */}
-          {reportType === 'monthly' && splitReport.isBarEnabled && (
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title"><Award size={12} style={{ display: 'inline', marginRight: '6px' }} />MOST SOLD {splitReport.barLabel.toUpperCase()}</span>
+                <span className="card-title"><Award size={12} style={{ display: 'inline', marginRight: '6px' }} />TOP SELLING ITEMS</span>
               </div>
               <div className="card-body" style={{ padding: 0, maxHeight: '250px', overflow: 'auto' }}>
                 <table className="data-table">
                   <thead><tr><th>#</th><th>ITEM</th><th style={{ textAlign: 'center' }}>SOLD</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
                   <tbody>
-                    {mostSoldLiquor.length > 0 ? mostSoldLiquor.slice(0, 15).map((item, idx) => (
+                    {mostSoldLiquor.slice(0, 15).map((item, idx) => (
                       <tr key={item.name}>
-                        <td style={{ fontWeight: 700, color: idx < 3 ? 'var(--brand-warning)' : 'var(--text-tertiary)', fontSize: '11px' }}>
-                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
-                        </td>
+                        <td>{idx + 1}</td>
                         <td style={{ fontWeight: 600 }}>{item.name}</td>
-                        <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{item.qty}</td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
                       </tr>
-                    )) : <tr><td colSpan="4" style={{ textAlign: 'center', padding: '16px' }}>No {splitReport.barLabel} sold this month</td></tr>}
+                    ))}
                   </tbody>
                 </table>
               </div>

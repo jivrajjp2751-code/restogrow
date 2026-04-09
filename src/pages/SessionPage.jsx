@@ -158,27 +158,20 @@ export default function SessionPage() {
           </div>
 
           <div className="card">
-            <div className="card-header"><span className="card-title">{r.split.barLabel.toUpperCase()} vs {r.split.kitchenLabel.toUpperCase()}</span></div>
+            <div className="card-header"><span className="card-title">DEPARTMENT BREAKDOWN</span></div>
             <div className="card-body" style={{ padding: '0 12px' }}>
               <table className="data-table" style={{ marginBottom: '8px' }}>
                 <tbody>
-                  {r.split.isBarEnabled && (
-                    <tr>
-                      <td style={{ fontWeight: 600 }}><Wine size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{r.split.barLabel.toUpperCase()}</td>
-                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{r.split.barQty} items</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{r.split.barTotal}</td>
+                  {(r.split.departments || []).map(d => (
+                    <tr key={d.id}>
+                      <td style={{ fontWeight: 600 }}><PieChart size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{d.name.toUpperCase()}</td>
+                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{d.qty} items</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{d.revenue}</td>
                     </tr>
-                  )}
-                  {r.split.isKitchenEnabled && (
-                    <tr>
-                      <td style={{ fontWeight: 600 }}><Coffee size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{r.split.kitchenLabel.toUpperCase()}</td>
-                      <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{r.split.kitchenQty} items</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-warning)' }}>{config.currency}{r.split.kitchenTotal}</td>
-                    </tr>
-                  )}
+                  ))}
                   <tr style={{ borderTop: '2px solid var(--border-color)' }}>
                     <td style={{ fontWeight: 800 }}>TOTAL</td>
-                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{r.split.barQty + r.split.kitchenQty} items</td>
+                    <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{r.totalItems} items</td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--brand-success)' }}>{config.currency}{r.totalRevenue}</td>
                   </tr>
                 </tbody>
@@ -187,45 +180,30 @@ export default function SessionPage() {
           </div>
         </div>
 
-        {/* Detailed Bar + Kitchen Items */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
-          {r.split.isBarEnabled && (
-            <div className="card">
+        {/* Detailed Department Items */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px', marginTop: '12px' }}>
+          {(r.split.departments || []).map(d => (
+            <div key={d.id} className="card">
               <div className="card-header">
-                <span className="card-title"><Wine size={12} style={{ display: 'inline', marginRight: '6px' }} />{r.split.barLabel.toUpperCase()} ITEMS SOLD</span>
-                <span className="badge badge-info">{r.split.barQty} qty</span>
+                <span className="card-title"><PieChart size={12} style={{ display: 'inline', marginRight: '6px' }} />{d.name.toUpperCase()} ITEMS SOLD</span>
+                <span className="badge badge-info">{d.qty} qty</span>
               </div>
               <div className="card-body" style={{ padding: 0, maxHeight: '300px', overflow: 'auto' }}>
                 <table className="data-table">
                   <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
                   <tbody>
-                    {r.split.bar.length > 0 ? r.split.bar.map(item => (
-                      <tr key={item.name}><td style={{ fontWeight: 600 }}>{item.name}</td><td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td><td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td></tr>
-                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No {r.split.barLabel} items sold</td></tr>}
+                    {d.items && d.items.length > 0 ? d.items.map(i => (
+                      <tr key={i.name}>
+                        <td style={{ fontWeight: 600 }}>{i.name}</td>
+                        <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{i.qty}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{i.revenue}</td>
+                      </tr>
+                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No items sold</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
-          )}
-
-          {r.split.isKitchenEnabled && (
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title"><Coffee size={12} style={{ display: 'inline', marginRight: '6px' }} />{r.split.kitchenLabel.toUpperCase()} ITEMS</span>
-                <span className="badge badge-warning">{r.split.kitchenQty} qty</span>
-              </div>
-              <div className="card-body" style={{ padding: 0, maxHeight: '300px', overflow: 'auto' }}>
-                <table className="data-table">
-                  <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
-                  <tbody>
-                    {r.split.kitchen.length > 0 ? r.split.kitchen.map(item => (
-                      <tr key={item.name}><td style={{ fontWeight: 600 }}>{item.name}</td><td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td><td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td></tr>
-                    )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No {r.split.kitchenLabel} items sold</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          ))}
         </div>
       </div>
     );
@@ -418,26 +396,17 @@ ${config.phone ? `<div class="c" style="font-size:9px">Tel: ${config.phone}</div
 <div class="d"></div>
 
 <h3>Breakdown</h3>
-${isBarEnabled ? `<div class="r"><span>${barLabel} (${r.split.barQty})</span><span>${config.currency}${r.split.barTotal}</span></div>` : ''}
-${isKitchenEnabled ? `<div class="r"><span>${kitchenLabel} (${r.split.kitchenQty})</span><span>${config.currency}${r.split.kitchenTotal}</span></div>` : ''}
+${(r.split.departments || []).map(d => `<div class="r"><span>${d.name} (${d.qty})</span><span>${config.currency}${d.revenue}</span></div>`).join('')}
 
 <div class="d"></div>
 
-${isBarEnabled ? `
-<h3>${barLabel.toUpperCase()} ITEMS</h3>
-${r.split.bar.map(i => `<div class="item"><span>${i.name} ×${i.qty}</span><span>${config.currency}${i.revenue}</span></div>`).join('')}
-${r.split.bar.length === 0 ? '<div class="item"><span>—</span></div>' : ''}
-<div class="total-row"><span>${barLabel.toUpperCase()} TOTAL</span><span>${config.currency}${r.split.barTotal}</span></div>
-` : ''}
-
+${(r.split.departments || []).map(d => `
+<h3>${d.name.toUpperCase()} ITEMS</h3>
+${d.items.map(i => `<div class="item"><span>${i.name} ×${i.qty}</span><span>${config.currency}${i.revenue}</span></div>`).join('')}
+${d.items.length === 0 ? '<div class="item"><span>—</span></div>' : ''}
+<div class="total-row"><span>${d.name.toUpperCase()} TOTAL</span><span>${config.currency}${d.revenue}</span></div>
 <div style="margin-top:4px"></div>
-
-${isKitchenEnabled ? `
-<h3>${kitchenLabel.toUpperCase()} ITEMS</h3>
-${r.split.kitchen.map(i => `<div class="item"><span>${i.name} ×${i.qty}</span><span>${config.currency}${i.revenue}</span></div>`).join('')}
-${r.split.kitchen.length === 0 ? '<div class="item"><span>—</span></div>' : ''}
-<div class="total-row"><span>${kitchenLabel.toUpperCase()} TOTAL</span><span>${config.currency}${r.split.kitchenTotal}</span></div>
-` : ''}
+`).join('')}
 
 <div class="d"></div>
 
