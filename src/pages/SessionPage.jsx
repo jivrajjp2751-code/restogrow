@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
 import { startSession, endSession, getSessionBills, getSplitReport } from '../store/data';
-import { Play, Square, Clock, DollarSign, Printer, TrendingUp, BarChart3, Coffee, Wine, Calendar, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { Play, Square, Clock, DollarSign, Printer, TrendingUp, BarChart3, Coffee, Wine, Calendar, ChevronDown, ChevronUp, Eye, PieChart } from 'lucide-react';
 
 export default function SessionPage() {
   const { currentUser, currentSession, refresh, config = {}, sessions: allSessions = [], categories = [], bills = [] } = useApp();
