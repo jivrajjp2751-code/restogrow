@@ -48,17 +48,22 @@ export default function SessionPage() {
   };
 
   function buildReportData(session, sessionBills, splitReport) {
+    const totalCost = sessionBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + ((i.buying_price || i.buyingPrice || 0) * (i.quantity || i.qty || 0)), 0), 0);
+    const totalRevenue = sessionBills.reduce((s, b) => s + (b.total || 0), 0);
+
     const report = {
       session: { ...session },
       bills: sessionBills,
-      totalRevenue: sessionBills.reduce((s, b) => s + (b.total || 0), 0),
+      totalRevenue,
+      totalCost,
+      totalProfit: totalRevenue - totalCost,
       totalBills: sessionBills.length,
       totalItems: sessionBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || i.qty || 0), 0), 0),
       paymentBreakdown: { Cash: 0, Card: 0, UPI: 0 },
       split: splitReport,
     };
     sessionBills.forEach(b => {
-      report.paymentBreakdown[b.paymentMode] = (report.paymentBreakdown[b.paymentMode] || 0) + b.total;
+      report.paymentBreakdown[b.paymentMode] = (report.paymentBreakdown[b.paymentMode] || 0) + (b.total || 0);
     });
     return report;
   }
@@ -120,24 +125,22 @@ export default function SessionPage() {
           <div className="stat-card">
             <div className="stat-icon green"><DollarSign size={20} /></div>
             <div>
-              <div className="stat-label">Total Revenue</div>
+              <div className="stat-label">Revenue</div>
               <div className="stat-value" style={{ color: 'var(--brand-success)' }}>{config.currency}{r.totalRevenue}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon purple"><TrendingUp size={20} /></div>
             <div>
-              <div className="stat-label">Total Bills</div>
-              <div className="stat-value">{r.totalBills}</div>
+              <div className="stat-label">Net Profit</div>
+              <div className="stat-value" style={{ color: 'var(--brand-primary-light)' }}>{config.currency}{r.totalProfit}</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon orange"><Clock size={20} /></div>
+            <div className="stat-icon orange"><BarChart3 size={20} /></div>
             <div>
-              <div className="stat-label">Duration</div>
-              <div className="stat-value" style={{ fontSize: '14px' }}>
-                {getDuration(r.session.startedAt, r.session.endedAt)}
-              </div>
+              <div className="stat-label">Total Bills</div>
+              <div className="stat-value">{r.totalBills}</div>
             </div>
           </div>
         </div>
@@ -166,7 +169,10 @@ export default function SessionPage() {
                     <tr key={d.id}>
                       <td style={{ fontWeight: 600 }}><PieChart size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{d.name.toUpperCase()}</td>
                       <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{d.qty} items</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{d.revenue}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>
+                        <div style={{ fontSize: '11px' }}>{config.currency}{d.revenue}</div>
+                        <div style={{ fontSize: '9px', opacity: 0.7 }}>P: {config.currency}{d.profit}</div>
+                      </td>
                     </tr>
                   ))}
                   <tr style={{ borderTop: '2px solid var(--border-color)' }}>
@@ -196,7 +202,10 @@ export default function SessionPage() {
                       <tr key={i.name}>
                         <td style={{ fontWeight: 600 }}>{i.name}</td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{i.qty}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{i.revenue}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                          <div style={{ fontWeight: 700 }}>{config.currency}{i.revenue}</div>
+                          <div style={{ fontSize: '9px', color: 'var(--brand-success)' }}>P: {config.currency}{i.profit}</div>
+                        </td>
                       </tr>
                     )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No items sold</td></tr>}
                   </tbody>
@@ -381,6 +390,7 @@ ${config.phone ? `<div class="c" style="font-size:9px">Tel: ${config.phone}</div
 <div class="r b"><span>Total Bills</span><span>${r.totalBills}</span></div>
 <div class="r b"><span>Items Sold</span><span>${r.totalItems}</span></div>
 <div class="r b" style="font-size:13px"><span>REVENUE</span><span>${config.currency}${r.totalRevenue}</span></div>
+<div class="r b" style="font-size:13px"><span>PROFIT</span><span>${config.currency}${r.totalProfit}</span></div>
 
 <div class="d"></div>
 
@@ -391,8 +401,8 @@ ${config.phone ? `<div class="c" style="font-size:9px">Tel: ${config.phone}</div
 
 <div class="d"></div>
 
-<h3>Breakdown</h3>
-${(r.split.departments || []).map(d => `<div class="r"><span>${d.name} (${d.qty})</span><span>${config.currency}${d.revenue}</span></div>`).join('')}
+<h3>Department Breakdown</h3>
+${(r.split.departments || []).map(d => `<div class="r"><span>${d.name} (${d.qty})</span><span>Rev: ${config.currency}${d.revenue} | Prf: ${config.currency}${d.profit}</span></div>`).join('')}
 
 <div class="d"></div>
 

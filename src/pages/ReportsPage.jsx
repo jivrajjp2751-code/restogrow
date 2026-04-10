@@ -32,6 +32,8 @@ export default function ReportsPage() {
 
   // KPI Calculations
   const totalRevenue = filteredBills.reduce((s, b) => s + (b.total || 0), 0);
+  const totalCost = filteredBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + ((i.buying_price || i.buyingPrice || 0) * (i.quantity || 0)), 0), 0);
+  const totalProfit = totalRevenue - totalCost;
   const totalBills = filteredBills.length;
   const totalItems = filteredBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
   
@@ -102,6 +104,7 @@ ${config.address ? `<div class="c" style="font-size:10px">${config.address}</div
 <div class="r b"><span>Total Bills</span><span>${totalBills}</span></div>
 <div class="r b"><span>Total Items Sold</span><span>${totalItems}</span></div>
 <div class="r b" style="font-size:14px"><span>TOTAL REVENUE</span><span>${config.currency}${totalRevenue}</span></div>
+<div class="r b" style="font-size:14px"><span>TOTAL PROFIT</span><span>${config.currency}${totalProfit}</span></div>
 <div class="d"></div>
 
 <h3>Payment Breakdown</h3>
@@ -111,15 +114,15 @@ ${config.address ? `<div class="c" style="font-size:10px">${config.address}</div
 <div class="d"></div>
 
 <h3>Sales Summary</h3>
-${(splitReport.departments || []).map(d => `<div class="r"><span>${d.name}: ${d.qty} items</span><span>${config.currency}${d.revenue}</span></div>`).join('')}
+${(splitReport.departments || []).map(d => `<div class="r"><span>${d.name}: ${d.qty} items</span><span>Rev: ${config.currency}${d.revenue} | Prf: ${config.currency}${d.profit}</span></div>`).join('')}
 <div class="d"></div>
 
 ${(splitReport.departments || []).map(d => `
 <div class="section-title">${d.name.toUpperCase()} ITEMS</div>
 <table>
-<tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th></tr>
-${d.items.map(i => `<tr><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
-<tr class="total-row"><td>${d.name.toUpperCase()} TOTAL</td><td style="text-align:center">${d.qty}</td><td style="text-align:right">${config.currency}${d.revenue}</td></tr>
+<tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th><th style="text-align:right">Profit</th></tr>
+${d.items.map(i => `<tr><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td><td style="text-align:right">${config.currency}${i.profit}</td></tr>`).join('')}
+<tr class="total-row"><td>${d.name.toUpperCase()} TOTAL</td><td style="text-align:center">${d.qty}</td><td style="text-align:right">${config.currency}${d.revenue}</td><td style="text-align:right">${config.currency}${d.profit}</td></tr>
 </table>`).join('')}
 
 ${reportType === 'monthly' && mostSoldLiquor.length > 0 ? `
@@ -203,15 +206,15 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
         <div className="stat-card">
           <div className="stat-icon purple"><PieChart size={20} /></div>
           <div>
-            <div className="stat-label">Total Bills</div>
-            <div className="stat-value">{totalBills}</div>
+            <div className="stat-label">Net Profit</div>
+            <div className="stat-value" style={{ color: 'var(--brand-primary-light)' }}>{config.currency}{totalProfit}</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon orange"><Calendar size={20} /></div>
+          <div className="stat-icon orange"><Award size={20} /></div>
           <div>
-            <div className="stat-label">Avg Order Value</div>
-            <div className="stat-value">{config.currency}{totalBills ? Math.round(totalRevenue / totalBills) : 0}</div>
+            <div className="stat-label">Total Bills</div>
+            <div className="stat-value">{totalBills}</div>
           </div>
         </div>
       </div>
@@ -243,7 +246,10 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
                     <tr key={d.id}>
                       <td style={{ fontWeight: 600 }}><PieChart size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{d.name.toUpperCase()}</td>
                       <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{d.qty} items</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>{config.currency}{d.revenue}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--brand-primary-light)' }}>
+                        <div style={{ fontSize: '11px' }}>{config.currency}{d.revenue}</div>
+                        <div style={{ fontSize: '9px', opacity: 0.7 }}>P: {config.currency}{d.profit}</div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -294,7 +300,10 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
                           <span style={{ fontWeight: 600 }}>{item.name}</span>
                         </td>
                         <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.qty}</td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.revenue}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                          <div style={{ fontWeight: 700 }}>{config.currency}{item.revenue}</div>
+                          <div style={{ fontSize: '9px', color: 'var(--brand-success)' }}>P: {config.currency}{item.profit}</div>
+                        </td>
                       </tr>
                     )) : <tr><td colSpan="3" style={{ textAlign: 'center', padding: '16px' }}>No items sold</td></tr>}
                   </tbody>

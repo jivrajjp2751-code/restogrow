@@ -176,12 +176,12 @@ export async function updateCategory(id, data) {
 export async function deleteCategory(id) { return dbDelete('categories', id); }
 
 export async function addMenuItem(data) { 
-  const { name, code, price, stock, categoryId } = data;
-  return dbInsert('menu_items', { name, code, price, stock, categoryId: categoryId }); 
+  const { name, code, price, buying_price, stock, categoryId } = data;
+  return dbInsert('menu_items', { name, code, price, buying_price, stock, categoryId: categoryId }); 
 }
 export async function updateMenuItem(id, data) { 
-  const { name, code, price, stock, categoryId } = data;
-  return dbUpdate('menu_items', id, { name, code, price, stock, categoryId: categoryId }); 
+  const { name, code, price, buying_price, stock, categoryId } = data;
+  return dbUpdate('menu_items', id, { name, code, price, buying_price, stock, categoryId: categoryId }); 
 }
 export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
@@ -254,11 +254,17 @@ export async function generateBill(orderId, paymentMode, discount) {
     createdAt: new Date().toISOString()
   });
 
+  // Fetch buying prices for items to log profit accurately
+  const { data: menuItemsData } = await supabase.from('menu_items').select('id, buying_price').eq('restaurant_id', _restaurantId);
+  const buyingPriceMap = {};
+  menuItemsData?.forEach(m => { buyingPriceMap[m.id] = m.buying_price || 0; });
+
   // Use camelCase for bill items
   const billItems = items.map(item => ({
     billId: billId,
     name: item.name,
     price: item.price,
+    buying_price: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
     quantity: item.quantity || item.qty || 0,
     categoryType: item.categoryType || item.category_type || 'bar',
     restaurant_id: _restaurantId
@@ -408,34 +414,36 @@ export function getSplitReport(bills, categories, config = {}) {
   bills.forEach(bill => (bill.items || []).forEach(item => {
     const qty = item.quantity || 0;
     const price = item.price || 0;
+    const cost = (item.buying_price || item.buyingPrice || 0) * qty;
+    const revenue = price * qty;
+    const profit = revenue - cost;
+
     const existing = allItems.find(i => i.name === item.name);
     if (existing) {
        existing.qty += qty;
-       existing.revenue += price * qty;
+       existing.revenue += revenue;
+       existing.profit += profit;
+       existing.cost += cost;
     } else {
-       allItems.push({ ...item, qty, revenue: price * qty });
+       allItems.push({ ...item, qty, revenue, cost, profit });
     }
   }));
 
   const departments = depts.map(dept => {
-    // Find categories for this dept
     const deptCatIds = categories.filter(c => c.type === dept.id).map(c => c.id);
-    
-    // Group items. Note: bill items have `categoryType` (string) and we can match by it if needed,
-    // but originally they also had `categoryId` if populated. Often we just match categoryType = dept.id.
     const items = allItems.filter(i => {
-      // support legacy 'bar' / 'kitchen' strings, or categoryId mapping
       if (i.categoryType === dept.id) return true;
       if (deptCatIds.includes(i.categoryId)) return true;
-      if (!i.categoryType && !i.categoryId) return dept.id === 'bar'; // legacy logic
+      if (!i.categoryType && !i.categoryId) return dept.id === 'bar';
       return false;
     }).sort((a,b) => b.qty - a.qty);
     
     const qty = items.reduce((s,i) => s + i.qty, 0);
     const revenue = items.reduce((s,i) => s + i.revenue, 0);
+    const profit = items.reduce((s,i) => s + i.profit, 0);
     
     return {
-      id: dept.id, name: dept.name, items, qty, revenue
+      id: dept.id, name: dept.name, items, qty, revenue, profit
     };
   });
   

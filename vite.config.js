@@ -12,11 +12,13 @@ export default defineConfig({
     cssCodeSplit: true,
     target: 'es2015',
     minify: 'esbuild',
+    sourcemap: false,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks: {
           'vendor-ui': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-utils': ['@supabase/supabase-js', 'date-fns', 'uuid'],
+          'vendor-utils': ['@supabase/supabase-js', 'uuid'],
           'vendor-icons': ['lucide-react']
         }
       }
