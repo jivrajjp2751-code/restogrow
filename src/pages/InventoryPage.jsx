@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { addStock, addMenuItem, addCategory, updateCategory, deleteCategory, getInventoryLog, getLowStockItems } from '../store/data';
 import { Package, AlertTriangle, Plus, Search, PlusCircle, Wine, Coffee, Edit3, Trash2 } from 'lucide-react';
@@ -20,13 +20,13 @@ export default function InventoryPage() {
   const [catModal, setCatModal] = useState(null);
   const [catForm, setCatForm] = useState({ name: '', color: '#6C5CE7', icon: '🍽️', shortcut: '', type: 'bar' });
 
-  const lowStockItems = getLowStockItems(menuItems);
-  const inventoryLog = getInventoryLog(inventory_log).reverse().slice(0, 50);
+  const lowStockItems = useMemo(() => getLowStockItems(menuItems), [menuItems]);
+  const inventoryLog = useMemo(() => getInventoryLog(inventory_log).reverse().slice(0, 50), [inventory_log]);
 
   // Filter by search across all items
-  const searchFiltered = menuItems.filter(i =>
+  const searchFiltered = useMemo(() => menuItems.filter(i =>
     !searchQuery || i.name?.toLowerCase().includes(searchQuery.toLowerCase()) || i.code?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ), [menuItems, searchQuery]);
 
   const handleAddStock = async () => {
     if (!stockModal || !addQty || Number(addQty) <= 0) { addToast('Enter valid qty', 'error'); return; }
@@ -39,7 +39,7 @@ export default function InventoryPage() {
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
   };
 
-  const openAddItem = (deptId) => {
+  const openAddItem = useCallback((deptId) => {
     const deptCats = categories.filter(c => c.type === deptId);
     setNewItemForm({
       name: '', code: `ITM${Date.now().toString().slice(-4)}`,
@@ -47,7 +47,7 @@ export default function InventoryPage() {
       stock: '50', unit: deptId === 'bar' ? 'bottle' : 'plate', isVeg: true,
     });
     setAddItemModal(deptId);
-  };
+  }, [categories]);
 
   const handleAddNewItem = async () => {
     if (!newItemForm.name || !newItemForm.price) { addToast('Name & Price required', 'error'); return; }

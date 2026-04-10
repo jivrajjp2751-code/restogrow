@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp, useToast } from '../context/AppContext';
-import { updateConfig, injectFakeData } from '../store/data';
+import { updateConfig } from '../store/data';
 import { Settings, Store, Receipt, RefreshCw } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -10,7 +10,7 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     try { await updateConfig(form); refresh(); addToast('Settings saved', 'success'); }
-    catch (e) { addToast('Failed', 'error'); }
+    catch { addToast('Failed', 'error'); }
   };
 
   const handleReset = () => {

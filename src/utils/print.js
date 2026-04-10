@@ -20,7 +20,7 @@ export function printSplitKOT(order, tableNumber, categories = [], config = {}) 
   
   let printedCount = 0;
   
-  departments.forEach((dept, index) => {
+  departments.forEach((dept) => {
     // Find all category IDs for this department
     const deptCatIds = categories.filter(c => c.type === dept.id).map(c => c.id);
     // Find all items in this order that belong to those categories

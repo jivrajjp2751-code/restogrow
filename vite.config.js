@@ -4,18 +4,29 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './',  // Relative paths so dist/ works offline from file://
-  resolve: {
-    alias: {
-      tslib: 'tslib/tslib.es6.js'
-    }
-  },
+  base: './',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    // Performance optimizations for low-end PCs
+    cssCodeSplit: true,
+    target: 'es2015',
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-ui': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-utils': ['@supabase/supabase-js', 'date-fns', 'uuid'],
+          'vendor-icons': ['lucide-react']
+        }
+      }
+    },
+    commonjsOptions: {
+      include: [/tslib/, /node_modules/],
+    },
   },
   optimizeDeps: {
-    include: ['@supabase/supabase-js', 'tslib']
+    include: ['@supabase/supabase-js']
   },
   server: {
     host: '127.0.0.1',

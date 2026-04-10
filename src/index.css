@@ -35,18 +35,18 @@
   --status-reserved: #FF3B30;
   --status-reserved-bg: rgba(255, 59, 48, 0.1);
 
-  --shadow-sm: 0 4px 12px rgba(0,0,0,0.05);
-  --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
-  --shadow-lg: 0 16px 40px rgba(0,0,0,0.12);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
   --font-ui: 'Inter', -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --transition-fast: 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --transition-fast: 0.1s linear;
 }
 
 
@@ -487,8 +487,8 @@ ul, ol { list-style: none; }
 
 /* ===== MODAL ===== */
 .modal-backdrop {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(4px); z-index: 1000;
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  z-index: 1000;
   display: flex; align-items: center; justify-content: center;
   animation: fadeIn 0.15s ease;
 }
@@ -768,9 +768,9 @@ ul, ol { list-style: none; }
 
 /* ===== PULSE ANIMATION ===== */
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0.4); }
-  70% { box-shadow: 0 0 0 8px rgba(0, 184, 148, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0); }
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
 }
 
 /* ===== PAST SESSIONS HISTORY ===== */
@@ -1796,8 +1796,8 @@ ul, ol { list-style: none; }
 }
 
 .login-card {
-  background: rgba(255, 255, 255, 0.05); padding: 40px; border-radius: 24px;
-  backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(25, 26, 46, 0.95); padding: 40px; border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2); width: 360px;
   display: flex; flex-direction: column; align-items: center;
   animation: slideUp 0.4s ease;

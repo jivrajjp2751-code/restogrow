@@ -3,7 +3,7 @@ const file = 'src/pages/SettingsPage.jsx';
 let content = fs.readFileSync(file, 'utf8');
 
 // We need to replace the DEPARTMENTS section
-const newSection = \
+const newSection = `
       <div className="config-section">
         <h3 className="config-section-title">?? DEPARTMENTS</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '12px' }}>
@@ -30,7 +30,7 @@ const newSection = \
            newDepts.push({ id: 'dept_' + Date.now(), name: 'New Dept' });
            setForm(f => ({ ...f, departments: newDepts }));
         }}>+ ADD DEPARTMENT</button>
-      </div>\;
+      </div>`;
 
 const startIdx = content.indexOf('<h3 className="config-section-title">?? DEPARTMENTS</h3>');
 const outerDivStart = content.lastIndexOf('<div className="config-section">', startIdx);

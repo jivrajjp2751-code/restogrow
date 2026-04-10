@@ -76,15 +76,29 @@ export async function syncAll() {
       }
     });
 
-    // Map snake_case database records to camelCase for UI
+    // Pre-process items into Maps for O(N) lookups instead of O(N^2)
+    const orderItemsMap = {};
+    (results.order_items || []).forEach(item => {
+      item.orderId = item.orderId || item.order_id;
+      item.menuItemId = item.menuItemId || item.menu_item_id;
+      item.categoryType = item.categoryType || item.category_type;
+      if (!orderItemsMap[item.orderId]) orderItemsMap[item.orderId] = [];
+      orderItemsMap[item.orderId].push(item);
+    });
+
+    const billItemsMap = {};
+    (results.bill_items || []).forEach(item => {
+      item.billId = item.billId || item.bill_id;
+      item.categoryType = item.categoryType || item.category_type;
+      item.quantity = item.quantity || item.qty || 0;
+      if (!billItemsMap[item.billId]) billItemsMap[item.billId] = [];
+      billItemsMap[item.billId].push(item);
+    });
+
+    // Map snake_case database records to camelCase for UI faster
     (results.orders || []).forEach(o => {
       o.tableId = o.tableId || o.table_id;
-      o.items = (results.order_items || []).filter(item => {
-        item.orderId = item.orderId || item.order_id;
-        item.menuItemId = item.menuItemId || item.menu_item_id;
-        item.categoryType = item.categoryType || item.category_type;
-        return item.orderId === o.id;
-      });
+      o.items = orderItemsMap[o.id] || [];
     });
     
     (results.bills || []).forEach(b => {
@@ -93,13 +107,7 @@ export async function syncAll() {
       b.paymentMode = b.paymentMode || b.payment_mode;
       b.sessionId = b.sessionId || b.session_id;
       b.createdAt = b.createdAt || b.created_at;
-      
-      b.items = (results.bill_items || []).filter(item => {
-        item.billId = item.billId || item.bill_id;
-        item.categoryType = item.categoryType || item.category_type;
-        item.quantity = item.quantity || item.qty || 0;
-        return item.billId === b.id;
-      });
+      b.items = billItemsMap[b.id] || [];
     });
 
     return results;
@@ -232,13 +240,6 @@ export async function generateBill(orderId, paymentMode, discount) {
   const serviceCharge = (subtotal * (cfg.serviceChargeRate || 0)) / 100;
   const discountAmount = (subtotal * (discount || 0)) / 100;
   const total = Math.round(subtotal + taxAmount + serviceCharge - discountAmount);
-
-  // Get active session
-  const { data: activeSession } = await supabase.from('sessions')
-    .select('id')
-    .eq('restaurant_id', _restaurantId)
-    .eq('status', 'active')
-    .maybeSingle();
 
   const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
@@ -445,8 +446,6 @@ export function getSessionBills(session, bills) {
   if (!session || !bills) return [];
   
   const sessionId = session.id;
-  // Get session date for fallback matching (bills created before sessionId fix)
-  const sDate = (session.startedAt || '').substring(0, 10);
   
   return bills.filter(b => {
     // Primary: match by sessionId

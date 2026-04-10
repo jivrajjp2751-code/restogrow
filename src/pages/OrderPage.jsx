@@ -5,7 +5,7 @@ import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
   createOrder, generateBill, cancelOrder
 } from '../store/data';
-import { printSplitKOT, printKitchenKOT, printBarKOT, printBillDirect } from '../utils/print';
+import { printSplitKOT, printBillDirect } from '../utils/print';
 import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, Wine, Coffee, CreditCard, Banknote, Smartphone, Receipt } from 'lucide-react';
 
 export default function OrderPage() {
@@ -48,7 +48,7 @@ export default function OrderPage() {
     } finally {
       setOrderLoading(false);
     }
-  }, [tableId, table]);
+  }, [tableId, table, refresh, addToast]);
 
   useEffect(() => { loadOrder(); }, [loadOrder]);
 
@@ -71,7 +71,7 @@ export default function OrderPage() {
       items = (menuItems || []).filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
     }
     return items;
-  }, [menuItems, categoryFilter, searchQuery, deptCatIds, isSearching, q]);
+  }, [menuItems, categoryFilter, deptCatIds, isSearching, q]);
 
   const handleAddItem = async (menuItem) => {
     if (!order) { addToast("Order not initialized yet", "warning"); return; }
@@ -96,7 +96,7 @@ export default function OrderPage() {
       if (newQty <= 0) await removeOrderItem(order.id, itemId);
       else await updateOrderItem(order.id, itemId, { quantity: newQty });
       await loadOrder();
-    } catch (e) { addToast('Failed', 'error'); }
+    } catch { addToast('Failed', 'error'); }
     finally { setBusy(false); }
   };
 
@@ -157,7 +157,7 @@ export default function OrderPage() {
         return;
       }
       
-      const res = printSplitKOT(filteredOrder, tableLabel, categories, config);
+      printSplitKOT(filteredOrder, tableLabel, categories, config);
       addToast('Department KOT printed', 'success');
     } catch (e) { addToast('Print failed', 'error'); }
     setShowKOTMenu(false);
@@ -186,7 +186,7 @@ export default function OrderPage() {
     try {
       const result = await generateBill(order.id, paymentMode, discount);
       if (result?.bill) {
-        try { printBillDirect({ ...result.bill, currency: config.currency }); } catch {}
+        try { printBillDirect({ ...result.bill, currency: config.currency }); } catch { /* ignore print error */ }
         await refresh();
         addToast('Direct bill generated & printed', 'success');
         setDirectBillModal(false);
@@ -202,7 +202,6 @@ export default function OrderPage() {
   const tax = (subtotal * (config.taxRate || 0)) / 100;
   const serviceCharge = (subtotal * (config.serviceChargeRate || 0)) / 100;
   const total = subtotal + tax + serviceCharge;
-  // Generic counts removed. total is sufficient.
 
   if (!table && !orderLoading) {
     return (
@@ -227,9 +226,7 @@ export default function OrderPage() {
   }
 
   const renderItemCard = (item) => {
-    // Only gray out if they are actively using stock tracking (e.g. stock <= 0 and they manually manage it)
-    // To prevent false blockages, we won't block clicking here anymore.
-    const isOOS = false; // Bypass visual OOS for now so users can select unconditionally
+    const isOOS = false;
     return (
       <div
         key={item.id}

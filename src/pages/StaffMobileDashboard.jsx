@@ -60,7 +60,7 @@ export default function StaffMobileDashboard() {
     if (activeCategory !== 'all') items = items.filter(i => i.categoryId === activeCategory);
     if (q) items = items.filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
     return items;
-  }, [menuItems, activeDeptId, activeCategory, searchQuery, deptCategories]);
+  }, [menuItems, activeCategory, searchQuery, deptCategories]);
 
   const handleTableClick = (table) => {
     if (!currentSession) { addToast('Start a session first!', 'warning'); return; }
@@ -177,7 +177,7 @@ export default function StaffMobileDashboard() {
     try {
       const result = await generateBill(order.id, paymentMode, discount);
       if (result?.bill) {
-        try { printBillDirect({ ...result.bill, currency: config.currency }); } catch {}
+        try { printBillDirect({ ...result.bill, currency: config.currency }); } catch { /* ignore print error */ }
         await refresh();
         addToast('Bill generated & printed', 'success');
         setBillModal(false);

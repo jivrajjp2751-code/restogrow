@@ -349,10 +349,6 @@ export default function SessionPage() {
 // ===== Print HTML helpers =====
 function buildDailyReportHTML(report, config) {
   const r = report;
-  const isKitchenEnabled = config.isKitchenEnabled !== false;
-  const isBarEnabled = config.isBarEnabled !== false;
-  const barLabel = config.barLabel || 'Bar';
-  const kitchenLabel = config.kitchenLabel || 'Kitchen';
 
   return `<!DOCTYPE html>
 <html><head><title>Daily Report - ${r.session.date}</title>

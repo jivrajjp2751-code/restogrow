@@ -8,7 +8,6 @@ import {
 const navItems = [
   { to: '/session', icon: Play, label: 'Session' },
   { to: '/tables', icon: LayoutGrid, label: 'Tables' },
-  { to: '/orders', icon: ClipboardList, label: 'Orders' },
   { to: '/billing', icon: Receipt, label: 'Bills' },
   { to: '/inventory', icon: Package, label: 'Stock', adminOnly: true },
   { to: '/users', icon: Users, label: 'Users', adminOnly: true },

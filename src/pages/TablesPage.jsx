@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { updateTable, createOrder, getOrderForTable, addTable, deleteTable, addSection, updateSection, deleteSection } from '../store/data';
+import { createOrder, addTable, deleteTable, addSection, updateSection, deleteSection } from '../store/data';
 import { Plus, Edit3, Trash2, Settings, X } from 'lucide-react';
 
 export default function TablesPage() {
@@ -47,7 +47,7 @@ export default function TablesPage() {
     } else if (table.status === 'reserved') {
       setCustomerModal(table);
     }
-  }, [navigate, editMode, currentSession]);
+  }, [navigate, editMode, currentSession, addToast]);
 
   const handleStartOrder = async () => {
     if (!customerModal) return;
