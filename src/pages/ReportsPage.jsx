@@ -32,7 +32,7 @@ export default function ReportsPage() {
 
   // KPI Calculations
   const totalRevenue = filteredBills.reduce((s, b) => s + (b.total || 0), 0);
-  const totalCost = filteredBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + ((i.buying_price || i.buyingPrice || 0) * (i.quantity || 0)), 0), 0);
+  const totalCost = filteredBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + ((i.buyingPrice || 0) * (i.quantity || 0)), 0), 0);
   const totalProfit = totalRevenue - totalCost;
   const totalBills = filteredBills.length;
   const totalItems = filteredBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);

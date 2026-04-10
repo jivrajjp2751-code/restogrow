@@ -48,7 +48,7 @@ export default function SessionPage() {
   };
 
   function buildReportData(session, sessionBills, splitReport) {
-    const totalCost = sessionBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + ((i.buying_price || i.buyingPrice || 0) * (i.quantity || i.qty || 0)), 0), 0);
+    const totalCost = sessionBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + ((i.buyingPrice || 0) * (i.quantity || i.qty || 0)), 0), 0);
     const totalRevenue = sessionBills.reduce((s, b) => s + (b.total || 0), 0);
 
     const report = {

@@ -176,12 +176,12 @@ export async function updateCategory(id, data) {
 export async function deleteCategory(id) { return dbDelete('categories', id); }
 
 export async function addMenuItem(data) { 
-  const { name, code, price, buying_price, stock, categoryId } = data;
-  return dbInsert('menu_items', { name, code, price, buying_price, stock, categoryId: categoryId }); 
+  const { name, code, price, buyingPrice, stock, categoryId } = data;
+  return dbInsert('menu_items', { name, code, price, buyingPrice, stock, categoryId: categoryId }); 
 }
 export async function updateMenuItem(id, data) { 
-  const { name, code, price, buying_price, stock, categoryId } = data;
-  return dbUpdate('menu_items', id, { name, code, price, buying_price, stock, categoryId: categoryId }); 
+  const { name, code, price, buyingPrice, stock, categoryId } = data;
+  return dbUpdate('menu_items', id, { name, code, price, buyingPrice, stock, categoryId: categoryId }); 
 }
 export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
@@ -255,16 +255,16 @@ export async function generateBill(orderId, paymentMode, discount) {
   });
 
   // Fetch buying prices for items to log profit accurately
-  const { data: menuItemsData } = await supabase.from('menu_items').select('id, buying_price').eq('restaurant_id', _restaurantId);
+  const { data: menuItemsData } = await supabase.from('menu_items').select('id, buyingPrice').eq('restaurant_id', _restaurantId);
   const buyingPriceMap = {};
-  menuItemsData?.forEach(m => { buyingPriceMap[m.id] = m.buying_price || 0; });
+  menuItemsData?.forEach(m => { buyingPriceMap[m.id] = m.buyingPrice || 0; });
 
   // Use camelCase for bill items
   const billItems = items.map(item => ({
     billId: billId,
     name: item.name,
     price: item.price,
-    buying_price: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
+    buyingPrice: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
     quantity: item.quantity || item.qty || 0,
     categoryType: item.categoryType || item.category_type || 'bar',
     restaurant_id: _restaurantId
@@ -414,7 +414,7 @@ export function getSplitReport(bills, categories, config = {}) {
   bills.forEach(bill => (bill.items || []).forEach(item => {
     const qty = item.quantity || 0;
     const price = item.price || 0;
-    const cost = (item.buying_price || item.buyingPrice || 0) * qty;
+    const cost = (item.buyingPrice || 0) * qty;
     const revenue = price * qty;
     const profit = revenue - cost;
 

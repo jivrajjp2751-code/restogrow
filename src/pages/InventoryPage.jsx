@@ -14,7 +14,7 @@ export default function InventoryPage() {
   const [addQty, setAddQty] = useState('');
   const [addItemModal, setAddItemModal] = useState(null); // 'bar' or 'kitchen'
   const [newItemForm, setNewItemForm] = useState({
-    name: '', code: '', price: '', buying_price: '', categoryId: '', stock: '', unit: 'bottle', isVeg: true,
+    name: '', code: '', price: '', buyingPrice: '', categoryId: '', stock: '', unit: 'bottle', isVeg: true,
   });
   // Category management
   const [catModal, setCatModal] = useState(null);
@@ -40,10 +40,10 @@ export default function InventoryPage() {
   };
 
   const openAddItem = useCallback((deptId) => {
-    const deptCats = categories.filter(c => c.type === deptId);
+    const deptCats = (categories || []).filter(c => String(c.type).toLowerCase() === String(deptId).toLowerCase());
     setNewItemForm({
       name: '', code: `ITM${Date.now().toString().slice(-4)}`,
-      price: '', categoryId: deptCats[0]?.id || '',
+      price: '', buyingPrice: '', categoryId: deptCats[0]?.id || '',
       stock: '50', unit: deptId === 'bar' ? 'bottle' : 'plate', isVeg: true,
     });
     setAddItemModal(deptId);
@@ -51,17 +51,21 @@ export default function InventoryPage() {
 
   const handleAddNewItem = async () => {
     if (!newItemForm.name || !newItemForm.price) { addToast('Name & Price required', 'error'); return; }
+    if (!newItemForm.categoryId) { addToast('Please select a category', 'warning'); return; }
     try {
       await addMenuItem({
         ...newItemForm,
         price: Number(newItemForm.price),
-        buying_price: Number(newItemForm.buying_price) || 0,
+        buyingPrice: Number(newItemForm.buyingPrice) || 0,
         stock: Number(newItemForm.stock) || 0,
       });
       refresh();
       addToast(`${newItemForm.name} added`, 'success');
       setAddItemModal(null);
-    } catch { addToast('Failed', 'error'); }
+    } catch (e) { 
+      addToast('Failed: ' + (e.message || 'Check database schema'), 'error'); 
+      console.error(e);
+    }
   };
 
   // Category handlers
@@ -112,7 +116,7 @@ export default function InventoryPage() {
               <td style={{ fontWeight: 600 }}>{item.name}</td>
               <td><code style={{ fontSize: '10px', padding: '1px 4px', background: 'var(--bg-tertiary)', borderRadius: '2px', fontFamily: 'var(--font-mono)' }}>{item.code}</code></td>
               <td style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{cat?.icon} {cat?.name || '—'}</td>
-              <td style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{config.currency}{item.buying_price || 0}</td>
+              <td style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{config.currency}{item.buyingPrice || 0}</td>
               <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--brand-success)' }}>{config.currency}{item.price}</td>
               <td>
                 <div className="stock-indicator">
@@ -340,15 +344,16 @@ export default function InventoryPage() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">Buying Price ({config.currency})</label>
-                  <input type="number" className="input" value={newItemForm.buying_price}
-                    onChange={e => setNewItemForm(f => ({ ...f, buying_price: e.target.value }))}
+                  <input type="number" className="input" value={newItemForm.buyingPrice}
+                    onChange={e => setNewItemForm(f => ({ ...f, buyingPrice: e.target.value }))}
                     placeholder="0" />
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Category</label>
+                  <label className="input-label">Category *</label>
                   <select className="select" value={newItemForm.categoryId}
                     onChange={e => setNewItemForm(f => ({ ...f, categoryId: e.target.value }))}>
-                    {categories.filter(c => c.type === addItemModal).map(c => (
+                    <option value="">— Select Category —</option>
+                    {(categories || []).filter(c => String(c.type).toLowerCase() === String(addItemModal).toLowerCase()).map(c => (
                       <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
                     ))}
                   </select>
