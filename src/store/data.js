@@ -155,33 +155,40 @@ export async function addTable(data) {
   const { number, label, sectionId } = data;
   return dbInsert('tables', { number, label, sectionId: sectionId }); 
 }
+
+// --- PRINT QUEUE SYSTEM ---
+export async function createPrintJob(type, content) {
+  return dbInsert('print_jobs', {
+    type,
+    content,
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  });
+}
+
+export async function markPrintJobDone(jobId) {
+  return dbUpdate('print_jobs', jobId, { status: 'completed' });
+}
+
+export async function addSection(data) { return dbInsert('sections', { ...data, surcharge: Number(data.surcharge) || 0 }); }
+export async function updateSection(id, data) { return dbUpdate('sections', { ...data, surcharge: Number(data.surcharge) || 0 }); }
+export async function deleteSection(id) { return dbDelete('sections', id); }
+
 export async function updateTable(id, data) {
   const { number, label, sectionId, status } = data;
   return dbUpdate('tables', id, { number, label, sectionId: sectionId, status });
 }
 export async function deleteTable(id) { return dbDelete('tables', id); }
 
-export async function addSection(data) { return dbInsert('sections', data); }
-export async function updateSection(id, data) { return dbUpdate('sections', id, data); }
-export async function deleteSection(id) { return dbDelete('sections', id); }
-
-export async function addCategory(data) { 
-  const { name, icon, type } = data;
-  return dbInsert('categories', { name, icon, type }); 
-}
-export async function updateCategory(id, data) { 
-  const { name, icon, type } = data;
-  return dbUpdate('categories', id, { name, icon, type }); 
-}
-export async function deleteCategory(id) { return dbDelete('categories', id); }
+// Category management removed - items linked to departments directly
 
 export async function addMenuItem(data) { 
-  const { name, code, price, buyingPrice, stock, categoryId } = data;
-  return dbInsert('menu_items', { name, code, price, buyingPrice, stock, categoryId: categoryId }); 
+  const { name, code, price, buyingPrice, stock, deptId } = data;
+  return dbInsert('menu_items', { name, code, price, buyingPrice, stock, deptId }); 
 }
 export async function updateMenuItem(id, data) { 
-  const { name, code, price, buyingPrice, stock, categoryId } = data;
-  return dbUpdate('menu_items', id, { name, code, price, buyingPrice, stock, categoryId: categoryId }); 
+  const { name, code, price, buyingPrice, stock, deptId } = data;
+  return dbUpdate('menu_items', id, { name, code, price, buyingPrice, stock, deptId }); 
 }
 export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
@@ -210,16 +217,32 @@ export async function cancelOrder(orderId, tableId) {
   }
 }
 
-export async function addItemToOrder(orderId, menuItem) {
-  // Database strictly uses camelCase for the columns
-  return dbInsert('order_items', {
-    orderId: orderId,
-    menuItemId: menuItem.id,
-    name: menuItem.name,
-    price: menuItem.price,
-    quantity: 1,
-    categoryType: menuItem.categoryType || 'bar'
-  });
+export async function addItemToOrder(orderId, item) {
+  // 1. Get order's table and section surcharge
+  const { data: order } = await supabase.from('orders').select('tableId').eq('id', orderId).single();
+  let surcharge = 0;
+  if (order?.tableId) {
+    const { data: table } = await supabase.from('tables').select('sectionId').eq('id', order.tableId).single();
+    if (table?.sectionId) {
+      const { data: section } = await supabase.from('sections').select('surcharge').eq('id', table.sectionId).single();
+      surcharge = section?.surcharge || 0;
+    }
+  }
+  
+  const surchargeFactor = 1 + (surcharge / 100);
+  const finalPrice = Math.round((item.price || 0) * surchargeFactor);
+
+  const payload = {
+    orderId,
+    menuItemId: item.id || item.menuItemId,
+    name: item.name,
+    price: finalPrice,
+    quantity: item.quantity || 1,
+    categoryType: item.categoryType || item.deptId || 'bar',
+    note: item.note || '',
+    restaurant_id: _restaurantId
+  };
+  return dbInsert('order_items', payload);
 }
 
 export async function generateBill(orderId, paymentMode, discount) {
@@ -266,7 +289,7 @@ export async function generateBill(orderId, paymentMode, discount) {
     price: item.price,
     buyingPrice: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
     quantity: item.quantity || item.qty || 0,
-    categoryType: item.categoryType || item.category_type || 'bar',
+    categoryType: item.deptId || item.categoryType || item.category_type || 'bar',
     restaurant_id: _restaurantId
   }));
   
@@ -430,11 +453,9 @@ export function getSplitReport(bills, categories, config = {}) {
   }));
 
   const departments = depts.map(dept => {
-    const deptCatIds = categories.filter(c => c.type === dept.id).map(c => c.id);
     const items = allItems.filter(i => {
+      if (i.deptId === dept.id) return true;
       if (i.categoryType === dept.id) return true;
-      if (deptCatIds.includes(i.categoryId)) return true;
-      if (!i.categoryType && !i.categoryId) return dept.id === 'bar';
       return false;
     }).sort((a,b) => b.qty - a.qty);
     

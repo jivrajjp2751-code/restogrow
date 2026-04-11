@@ -3,15 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
 import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
-  createOrder, generateBill, cancelOrder
+  createOrder, generateBill, cancelOrder, createPrintJob
 } from '../store/data';
 import { printSplitKOT, printBillDirect } from '../utils/print';
-import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, Wine, Coffee, CreditCard, Banknote, Smartphone, Receipt } from 'lucide-react';
+import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, CreditCard, Banknote, Smartphone, Receipt } from 'lucide-react';
 
 export default function OrderPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
-  const { tables = [], menuItems = [], categories = [], config = {}, refresh, currentUser } = useApp();
+  const { tables = [], menuItems = [], config = {}, refresh, currentUser } = useApp();
   const { addToast } = useToast();
   const isAdmin = currentUser?.role === 'admin';
 
@@ -19,7 +19,6 @@ export default function OrderPage() {
   const [order, setOrder] = useState(null);
   const depts = useMemo(() => config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}], [config]);
   const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id || 'kitchen');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [noteModal, setNoteModal] = useState(null);
   const [noteText, setNoteText] = useState('');
@@ -30,7 +29,6 @@ export default function OrderPage() {
   const [busy, setBusy] = useState(false);
   const [orderLoading, setOrderLoading] = useState(true);
 
-  // Load order on mount
   const loadOrder = useCallback(async () => {
     if (!tableId) return;
     try {
@@ -42,9 +40,7 @@ export default function OrderPage() {
       }
       setOrder(existingOrder);
     } catch (e) {
-      console.error('Load order error:', e);
-      addToast('Order loading failed: ' + (e.message || 'Unknown'), 'error');
-      setOrder(null);
+      addToast('Order loading failed', 'error');
     } finally {
       setOrderLoading(false);
     }
@@ -53,36 +49,24 @@ export default function OrderPage() {
   useEffect(() => { loadOrder(); }, [loadOrder]);
 
   const safeItems = order?.items || [];
-
-  const activeDept = useMemo(() => depts.find(d => d.id === activeDeptId) || depts[0], [depts, activeDeptId]);
-
-  // Classify categories
-  const deptCategories = useMemo(() => (categories || []).filter(c => c.type === activeDept?.id), [categories, activeDept]);
-  const deptCatIds = useMemo(() => deptCategories.map(c => c.id), [deptCategories]);
-
-  // Filter items
-  const isSearching = searchQuery.length > 0;
   const q = searchQuery.toLowerCase();
 
   const deptItems = useMemo(() => {
-    let items = (menuItems || []).filter(i => deptCatIds.includes(i.categoryId));
-    if (categoryFilter !== 'all') items = items.filter(i => i.categoryId === categoryFilter);
-    if (isSearching) {
-      items = (menuItems || []).filter(i => i.name?.toLowerCase().includes(q) || i.code?.toLowerCase()?.includes(q));
-    }
-    return items;
-  }, [menuItems, categoryFilter, deptCatIds, isSearching, q]);
+    return (menuItems || []).filter(i => {
+      const matchDept = i.deptId === activeDeptId || (!i.deptId && activeDeptId === 'bar');
+      const matchSearch = !q || i.name?.toLowerCase().includes(q) || i.code?.toLowerCase().includes(q);
+      return matchDept && matchSearch;
+    });
+  }, [menuItems, activeDeptId, q]);
 
   const handleAddItem = async (menuItem) => {
-    if (!order) { addToast("Order not initialized yet", "warning"); return; }
-    if (busy) return;
+    if (!order || busy) return;
     setBusy(true);
     try {
-      const cat = (categories || []).find(c => c.id === menuItem.categoryId);
-      await addItemToOrder(order.id, { ...menuItem, categoryType: cat?.type || 'bar' });
+      await addItemToOrder(order.id, { ...menuItem, categoryType: menuItem.deptId || 'bar' });
       await loadOrder();
       addToast(`+ ${menuItem.name}`, 'success');
-    } catch (e) { addToast(e.message || 'Failed', 'error'); }
+    } catch { addToast('Failed', 'error'); }
     finally { setBusy(false); }
   };
 
@@ -104,7 +88,7 @@ export default function OrderPage() {
     if (!order || busy) return;
     setBusy(true);
     try { await removeOrderItem(order.id, itemId); await loadOrder(); }
-    catch (e) { addToast('Failed', 'error'); }
+    catch { addToast('Failed', 'error'); }
     finally { setBusy(false); }
   };
 
@@ -112,366 +96,115 @@ export default function OrderPage() {
     if (!order || !noteModal || busy) return;
     setBusy(true);
     try { await updateOrderItem(order.id, noteModal.id, { note: noteText }); await loadOrder(); }
-    catch (e) { addToast('Failed', 'error'); }
+    catch { addToast('Failed', 'error'); }
     finally { setBusy(false); }
     setNoteModal(null);
     setNoteText('');
   };
 
-  const handleGoToBilling = async () => {
-    if (!order || safeItems.length === 0) { addToast('Add items first', 'warning'); return; }
-    if (busy) return;
-    setBusy(true);
+  const handlePrintSplitKOT = async () => {
+    if (!order || safeItems.length === 0) return;
     try {
-      await refresh();
-      navigate(`/billing/${order.id}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // KOT print
-  const handlePrintSplitKOT = () => {
-    if (!order || safeItems.length === 0) { addToast('No items', 'warning'); return; }
-    try {
-      const tableLabel = table?.label || table?.number;
-      printSplitKOT(order, tableLabel, categories, config);
-      addToast('KOT printed for respective departments', 'success');
-    } catch (e) { addToast('Print failed', 'error'); }
+      await createPrintJob('KOT', { order, tableLabel: table?.label || table?.number });
+      addToast('Printing KOT...', 'info');
+    } catch { addToast('Print request failed', 'error'); }
     setShowKOTMenu(false);
-  };
-
-  const handlePrintDeptOnly = (deptId) => {
-    if (!order) return;
-    try {
-      const tableLabel = table?.label || table?.number;
-      // Filter the order items to only include those belonging to deptId categories
-      const deptCatIdsLocal = categories.filter(c => c.type === deptId).map(c => c.id);
-      const filteredOrder = {
-        ...order,
-        items: order.items.filter(i => deptCatIdsLocal.includes(i.categoryId))
-      };
-      
-      if (filteredOrder.items.length === 0) {
-        addToast('No items for this department', 'warning');
-        return;
-      }
-      
-      printSplitKOT(filteredOrder, tableLabel, categories, config);
-      addToast('Department KOT printed', 'success');
-    } catch (e) { addToast('Print failed', 'error'); }
-    setShowKOTMenu(false);
-  };
-
-  // Direct bill
-  const handleCancelOrder = async () => {
-    if (!order || busy) return;
-    if (!window.confirm('Cancel this order and free the table?')) return;
-    setBusy(true);
-    try {
-      await cancelOrder(order.id, table.id);
-      await refresh();
-      addToast('Order cancelled', 'info');
-      navigate('/tables');
-    } catch (e) {
-      addToast('Failed: ' + (e.message || ''), 'error');
-    } finally {
-      setBusy(false);
-    }
   };
 
   const handleDirectBill = async () => {
-    if (!order || safeItems.length === 0 || busy) return;
+    if (!order || busy) return;
     setBusy(true);
     try {
       const result = await generateBill(order.id, paymentMode, discount);
       if (result?.bill) {
-        try { printBillDirect({ ...result.bill, currency: config.currency }); } catch { /* ignore print error */ }
+        try { await createPrintJob('BILL', { bill: result.bill }); } catch {}
         await refresh();
-        addToast('Direct bill generated & printed', 'success');
-        setDirectBillModal(false);
         navigate('/tables');
-      } else {
-        addToast('Failed to generate bill', 'error');
       }
-    } catch (e) { addToast('Failed: ' + (e.message || ''), 'error'); }
+    } catch { addToast('Failed', 'error'); }
     finally { setBusy(false); }
   };
 
   const subtotal = safeItems.reduce((s, i) => s + ((i.price || 0) * (i.quantity || 0)), 0);
-  const tax = (subtotal * (config.taxRate || 0)) / 100;
-  const serviceCharge = (subtotal * (config.serviceChargeRate || 0)) / 100;
-  const total = subtotal + tax + serviceCharge;
+  const total = subtotal + (subtotal * (config.taxRate || 0) / 100);
 
-  if (!table && !orderLoading) {
-    return (
-      <div className="page-content">
-        <div className="empty-state">
-          <p className="empty-state-title">Table not found</p>
-          <button className="btn btn-primary" onClick={() => navigate('/tables')}>Back</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (orderLoading) {
-    return (
-      <div className="page-content">
-        <div className="resto-loader">
-          <div className="resto-logo-spin">RG</div>
-          <div className="resto-loader-text">Loading order...</div>
-        </div>
-      </div>
-    );
-  }
-
-  const renderItemCard = (item) => {
-    const isOOS = false;
-    return (
-      <div
-        key={item.id}
-        className="menu-item-card"
-        onClick={() => !isOOS && handleAddItem(item)}
-        style={{
-          opacity: isOOS ? 0.25 : busy ? 0.6 : 1,
-          pointerEvents: isOOS || busy ? 'none' : 'auto',
-          filter: isOOS ? 'grayscale(1)' : undefined,
-        }}
-      >
-        <div className="menu-item-name">{item.name}</div>
-        {item.code && <div className="menu-item-code">{item.code}</div>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '4px' }}>
-          <div className="menu-item-price">{config.currency}{item.price}</div>
-          {item.stock !== undefined && item.stock !== null && item.stock <= 5 && item.stock > 0 && (
-            <span style={{ fontSize: '9px', color: 'var(--brand-danger)', fontFamily: 'var(--font-mono)' }}>LOW:{item.stock}</span>
-          )}
-          {isOOS && <span className="badge badge-danger">OUT</span>}
-        </div>
-      </div>
-    );
-  };
+  if (orderLoading) return <div className="resto-loader"><div className="resto-logo-spin">RG</div></div>;
 
   return (
     <div className="order-layout">
-      {/* Left: Menu */}
       <div className="menu-panel">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button className="btn btn-ghost btn-icon" onClick={() => navigate('/tables')} title="Back">
-            <ArrowLeft size={16} />
-          </button>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
-              {table?.label || `T${table?.number}`} {table?.customerName && `— ${table.customerName}`}
-            </div>
-          </div>
-          <div style={{ position: 'relative' }}>
-            <button className="btn btn-sm btn-secondary" onClick={() => setShowKOTMenu(!showKOTMenu)} title="Print KOT">
-              <Printer size={12} /> KOT ▾
-            </button>
-            {showKOTMenu && (
-              <div className="kot-dropdown" style={{ minWidth: '200px' }}>
-                <button className="kot-dropdown-item" onClick={handlePrintSplitKOT}>
-                  <Printer size={12} /> <span>Print All KOT</span>
-                  <span className="kot-dropdown-sub">Split auto‑detect</span>
-                </button>
-                {depts.map(dept => {
-                   const deptCount = safeItems.filter(i => categories.find(c => c.id === i.categoryId)?.type === dept.id).length;
-                   return (
-                     <button key={dept.id} className="kot-dropdown-item bar" onClick={() => handlePrintDeptOnly(dept.id)}>
-                       <Printer size={12} /> <span>{dept.name} KOT Only</span>
-                       <span className="kot-dropdown-sub">{deptCount} items</span>
-                     </button>
-                   );
-                })}
-              </div>
-            )}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px' }}>
+          <button className="btn btn-ghost btn-icon" onClick={() => navigate('/tables')}><ArrowLeft size={16} /></button>
+          <div style={{ fontWeight: 800, fontSize: '13px' }}>{table?.label || 'Table'}</div>
         </div>
 
         <div className="search-input-wrapper">
-          <Search />
-          <input className="input" placeholder="Search all items..." value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                if (deptItems.length === 1) { handleAddItem(deptItems[0]); setSearchQuery(''); }
-              }
-              if (e.key === 'Escape') { setSearchQuery(''); e.target.blur(); }
-            }}
-          />
+          <Search size={14} />
+          <input className="input" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
         </div>
 
-        <div className="category-tabs compact" style={{ padding: '0 8px 8px', borderBottom: '1px solid var(--border-color)', marginBottom: '8px' }}>
+        <div className="category-tabs compact">
           {depts.map(dept => (
-             <button key={dept.id} className={`category-tab ${activeDeptId === dept.id ? 'active' : ''}`} onClick={() => { setActiveDeptId(dept.id); setCategoryFilter('all'); }}>
+             <button key={dept.id} className={`category-tab ${activeDeptId === dept.id ? 'active' : ''}`} onClick={() => setActiveDeptId(dept.id)}>
                 {dept.name}
              </button>
           ))}
         </div>
 
-        <div className="menu-split-container" style={{ display: 'block', height: 'calc(100% - 150px)', overflowY: 'auto' }}>
-            <div className="menu-split-section" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {!isSearching && (
-                <div className="category-tabs compact" style={{ padding: '0 10px', marginBottom: '8px' }}>
-                  <button className={`category-tab ${categoryFilter === 'all' ? 'active' : ''}`} onClick={() => setCategoryFilter('all')}>ALL</button>
-                  {deptCategories.map(cat => (
-                    <button key={cat.id} className={`category-tab ${categoryFilter === cat.id ? 'active' : ''}`} onClick={() => setCategoryFilter(cat.id)}>
-                      {cat.icon} {cat.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="menu-items-grid compact" style={{ padding: '0 10px 10px' }}>
-                {deptItems.map(renderItemCard)}
-                {deptItems.length === 0 && <div className="empty-state" style={{ gridColumn: '1/-1', padding: '12px' }}><p className="empty-state-text" style={{ fontSize: '10px' }}>No items</p></div>}
-              </div>
+        <div className="menu-items-grid compact" style={{ padding: '10px', overflowY: 'auto', height: 'calc(100% - 140px)' }}>
+          {deptItems.map(item => (
+            <div key={item.id} className="menu-item-card" onClick={() => handleAddItem(item)}>
+              <div className="menu-item-name">{item.name}</div>
+              <div className="menu-item-price">{config.currency}{item.price}</div>
             </div>
+          ))}
         </div>
       </div>
 
-      {/* Right: Order Panel */}
       <div className="order-panel">
-        <div className="order-panel-header">
-          <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '12px' }}>ORDER</span>
-          <span className="badge badge-info">{safeItems.length} items</span>
-        </div>
-
+        <div className="order-panel-header"><span>ORDER</span> <span className="badge badge-info">{safeItems.length}</span></div>
         <div className="order-items-list">
-          {safeItems.length > 0 ? (
-            safeItems.map(item => (
-              <div key={item.id} className="order-item">
-                <div className="order-item-info">
-                  <div className="order-item-name">
-                    {item.name}
-                    <span style={{
-                      fontSize: '8px', marginLeft: '4px', padding: '1px 3px',
-                      borderRadius: '2px', fontWeight: 700,
-                      background: item.categoryType === 'kitchen' ? 'rgba(253, 203, 110, 0.2)' : 'rgba(108, 92, 231, 0.2)',
-                      color: item.categoryType === 'kitchen' ? 'var(--brand-warning)' : 'var(--brand-primary-light)',
-                    }}>
-                      {item.categoryType === 'kitchen' ? 'K' : 'B'}
-                    </span>
-                  </div>
-                  {item.note && <div className="order-item-note">→ {item.note}</div>}
-                </div>
-                <div className="qty-controls">
-                  <button className="qty-btn" onClick={() => handleQtyChange(item.id, -1)} disabled={busy}><Minus size={10} /></button>
-                  <span className="qty-value">{item.quantity}</span>
-                  <button className="qty-btn" onClick={() => handleQtyChange(item.id, 1)} disabled={busy}><Plus size={10} /></button>
-                </div>
-                <div className="order-item-price">{config.currency}{(item.price || 0) * (item.quantity || 0)}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setNoteModal(item); setNoteText(item.note || ''); }}>
-                    <StickyNote size={10} />
-                  </button>
-                  <button className="btn btn-ghost btn-sm" style={{ color: 'var(--brand-danger)' }} onClick={() => handleRemoveItem(item.id)} disabled={busy}>
-                    <Trash2 size={10} />
-                  </button>
-                </div>
+          {safeItems.map(item => (
+            <div key={item.id} className="order-item">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '12px' }}>{item.name}</div>
+                {item.note && <div style={{ fontSize: '10px', color: 'var(--brand-primary)' }}>→ {item.note}</div>}
               </div>
-            ))
-          ) : (
-            <div className="empty-state">
-              <p className="empty-state-title" style={{ fontSize: '11px' }}>Empty</p>
-              <p className="empty-state-text">Click items to add</p>
+              <div className="qty-controls">
+                <button className="qty-btn" onClick={() => handleQtyChange(item.id, -1)}>-</button>
+                <span className="qty-value">{item.quantity}</span>
+                <button className="qty-btn" onClick={() => handleQtyChange(item.id, 1)}>+</button>
+              </div>
+              <div style={{ width: '60px', textAlign: 'right', fontWeight: 700 }}>{config.currency}{item.price * item.quantity}</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => {setNoteModal(item); setNoteText(item.note||'');}}><StickyNote size={12}/></button>
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Order Actions */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', padding: '12px' }}>
-          {safeItems.length > 0 && (
-            <div className="order-actions" style={{ gridTemplateColumns: isAdmin ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-              <button className="btn btn-secondary btn-lg" onClick={handlePrintSplitKOT}><Printer size={14} /> KOT</button>
-              {isAdmin && (
-                <button className="btn btn-warning btn-lg" onClick={() => setDirectBillModal(true)} title="Direct bill without KOT">
-                  <Receipt size={14} /> DIRECT
-                </button>
-              )}
-              <button className="btn btn-success btn-lg" onClick={handleGoToBilling}>BILL</button>
-            </div>
-          )}
-          <button className="btn btn-ghost" style={{ color: 'var(--brand-danger)', width: '100%' }} onClick={handleCancelOrder} disabled={busy}>
-             CANCEL ORDER
-          </button>
+        <div style={{ padding: '12px', borderTop: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontWeight: 700 }}>
+            <span>TOTAL</span><span>{config.currency}{Math.round(total)}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <button className="btn btn-secondary" onClick={handlePrintSplitKOT}><Printer size={14}/> KOT</button>
+            <button className="btn btn-success" onClick={() => navigate(`/billing/${order.id}`)}>BILL</button>
+          </div>
         </div>
       </div>
 
-      {/* Note Modal */}
       {noteModal && (
         <div className="modal-backdrop" onClick={() => setNoteModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">NOTE — {noteModal.name}</h3>
-              <button className="btn btn-ghost btn-icon" onClick={() => setNoteModal(null)}>✕</button>
-            </div>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{maxWidth:'300px'}}>
+            <div className="modal-header"><h3 className="modal-title">Note</h3></div>
             <div className="modal-body">
-              <textarea className="input" placeholder="e.g., No ice, extra lime..." value={noteText}
-                onChange={e => setNoteText(e.target.value)} rows={2} autoFocus
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddNote(); } }}
-              />
-              <div style={{ display: 'flex', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
-                {['No ice', 'Extra lime', 'On the rocks', 'Neat', 'With soda', 'Double'].map(q => (
-                  <button key={q} className="btn btn-sm btn-secondary" onClick={() => setNoteText(prev => prev ? `${prev}, ${q}` : q)}>{q}</button>
-                ))}
-              </div>
+              <input className="input" value={noteText} onChange={e => setNoteText(e.target.value)} autoFocus />
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setNoteModal(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleAddNote} disabled={busy}>Save</button>
+              <button className="btn btn-primary" onClick={handleAddNote}>Save</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Direct Bill Modal */}
-      {directBillModal && (
-        <div className="modal-backdrop" onClick={() => setDirectBillModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">DIRECT BILL — No KOT</h3>
-              <button className="btn btn-ghost btn-icon" onClick={() => setDirectBillModal(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                Generate bill directly without printing KOT. Ideal for counter items and takeaway.
-              </p>
-              <div style={{ marginBottom: '12px', maxHeight: '150px', overflow: 'auto', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '8px' }}>
-                {safeItems.map(item => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '11px' }}>
-                    <span>{item.name} ×{item.quantity}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{config.currency}{(item.price || 0) * (item.quantity || 0)}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)', marginBottom: '8px', color: 'var(--text-secondary)' }}>PAYMENT</div>
-              <div className="payment-modes" style={{ marginBottom: '12px' }}>
-                {[{ mode: 'Cash', icon: Banknote }, { mode: 'Card', icon: CreditCard }, { mode: 'UPI', icon: Smartphone }].map(p => (
-                  <button key={p.mode} className={`payment-mode-btn ${paymentMode === p.mode ? 'active' : ''}`}
-                    onClick={() => setPaymentMode(p.mode)}><p.icon size={18} /><span>{p.mode}</span></button>
-                ))}
-              </div>
-              <div className="input-group">
-                <label className="input-label">Discount (%)</label>
-                <input type="number" className="input" value={discount}
-                  onChange={e => setDiscount(Math.max(0, Math.min(100, Number(e.target.value) || 0)))} min="0" max="100" />
-              </div>
-              <div className="order-summary-row total" style={{ marginTop: '8px' }}>
-                <span>TOTAL</span>
-                <span>{config.currency}{Math.round(total - (subtotal * discount / 100))}</span>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setDirectBillModal(false)}>Cancel</button>
-              <button className="btn btn-success btn-lg" onClick={handleDirectBill} disabled={busy}>
-                <Receipt size={14} /> {busy ? 'GENERATING...' : 'GENERATE & PRINT'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showKOTMenu && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowKOTMenu(false)} />}
     </div>
   );
 }

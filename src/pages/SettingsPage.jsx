@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { updateConfig } from '../store/data';
 import { Settings, Store, Receipt, RefreshCw } from 'lucide-react';
@@ -8,8 +8,15 @@ export default function SettingsPage() {
   const { addToast } = useToast();
   const [form, setForm] = useState({ ...config });
 
+  const [isPrintStation, setIsPrintStation] = useState(localStorage.getItem('isPrintStation') === 'true');
+
   const handleSave = async () => {
-    try { await updateConfig(form); refresh(); addToast('Settings saved', 'success'); }
+    try { 
+      await updateConfig(form); 
+      localStorage.setItem('isPrintStation', isPrintStation);
+      refresh(); 
+      addToast('Settings saved', 'success'); 
+    }
     catch { addToast('Failed', 'error'); }
   };
 
@@ -82,6 +89,20 @@ export default function SettingsPage() {
       </div>
 
 
+
+      <div className="config-section">
+        <h3 className="config-section-title">🖨️ REMOTE PRINTING</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '12px' }}>
+          Enable this on the primary PC connected to the printer. Mobile devices will send print jobs to this PC automatically.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: isPrintStation ? 'rgba(78, 205, 196, 0.1)' : '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid', borderColor: isPrintStation ? '#4ecdc4' : 'transparent' }}>
+           <input type="checkbox" checked={isPrintStation} onChange={e => setIsPrintStation(e.target.checked)} style={{ width: '20px', height: '20px' }} autoFocus />
+           <div>
+             <div style={{ fontWeight: 700, fontSize: '13px' }}>Mark this device as PRINT STATION</div>
+             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Current status: {isPrintStation ? 'LISTENING FOR JOBS' : 'INACTIVE'}</div>
+           </div>
+        </div>
+      </div>
 
       <div className="config-section" style={{ borderColor: 'rgba(255,107,107,0.3)' }}>
         <h3 className="config-section-title" style={{ color: 'var(--brand-danger)' }}><RefreshCw size={14} /> DANGER ZONE</h3>

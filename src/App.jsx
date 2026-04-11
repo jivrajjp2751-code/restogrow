@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { AppProvider, ToastProvider, useApp } from './context/AppContext';
 import Sidebar from './components/Sidebar';
+import PrintListener from './components/PrintListener';
 import './index.css';
 
 // Lazy load pages for performance optimization on low-end PCs
@@ -102,6 +103,7 @@ export default function App() {
     <HashRouter>
       <ToastProvider>
         <AppProvider>
+          <PrintListener />
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/jivesh" element={<MasterPortal />} />

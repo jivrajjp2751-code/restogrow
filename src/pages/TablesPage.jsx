@@ -16,7 +16,7 @@ export default function TablesPage() {
   const [addTableModal, setAddTableModal] = useState(null);
   const [newTableForm, setNewTableForm] = useState({ label: '', seats: 4 });
   const [sectionModal, setSectionModal] = useState(null);
-  const [sectionForm, setSectionForm] = useState({ name: '', icon: '🏠', color: '#00B894' });
+  const [sectionForm, setSectionForm] = useState({ name: '', icon: '🏠', color: '#00B894', surcharge: 0 });
 
   const getTablesForSection = (sectionId) => tables.filter(t => t.sectionId === sectionId);
 
@@ -91,12 +91,12 @@ export default function TablesPage() {
       refresh();
       addToast(`Section "${sectionForm.name}" added`, 'success');
       setSectionModal(null);
-      setSectionForm({ name: '', icon: '🏠', color: '#00B894' });
+      setSectionForm({ name: '', icon: '🏠', color: '#00B894', surcharge: 0 });
     } catch (e) { addToast(e.message || 'Failed', 'error'); }
   };
 
   const handleEditSection = (section) => {
-    setSectionForm({ name: section.name, icon: section.icon, color: section.color });
+    setSectionForm({ name: section.name, icon: section.icon, color: section.color, surcharge: section.surcharge || 0 });
     setSectionModal(section);
   };
 
@@ -374,7 +374,14 @@ export default function TablesPage() {
                     onChange={e => setSectionForm(f => ({ ...f, color: e.target.value }))}
                     style={{ width: '100px' }} />
                 </div>
+                <div className="input-group">
+                <label className="input-label">Hidden Surcharge (%)</label>
+                <input type="number" className="input" value={sectionForm.surcharge}
+                  onChange={e => setSectionForm(f => ({ ...f, surcharge: Number(e.target.value) || 0 }))}
+                  placeholder="e.g. 15" />
+                <p style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Automatically adds % to item price in this section.</p>
               </div>
+            </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setSectionModal(null)}>Cancel</button>
