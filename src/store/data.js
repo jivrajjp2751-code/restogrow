@@ -217,17 +217,21 @@ export async function createOrder(tableId, tableLabel, customerName, createdBy) 
 }
 
 export async function cancelOrder(orderId, tableId) {
+  // 1. Cancel the specific order if we have ID
   if (orderId) {
     await dbUpdate('orders', orderId, { status: 'cancelled' });
   }
   
+  // 2. Clear ALL active orders for this table to prevent it from going "Occupied" again
   if (tableId && _restaurantId) {
+    // Try both tableId and table_id
     await supabase.from('orders')
       .update({ status: 'cancelled' })
       .eq('restaurant_id', _restaurantId)
-      .eq('tableId', tableId)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .or(`tableId.eq.${tableId},table_id.eq.${tableId}`);
       
+    // 3. Mark table as available
     await dbUpdate('tables', tableId, { status: 'available' });
   }
 }
@@ -271,16 +275,13 @@ export async function addItemToOrder(orderId, item) {
   const surchargeFactor = 1 + (surcharge / 100);
   const finalPrice = Math.round((item.price || 0) * surchargeFactor);
 
-  // Payload with both camel and snake for maximum compatibility with whatever DB schema the client has
+  // Payload with ONLY standard camelCase columns to avoid "column not found" errors
   const payload = {
-    order_id: orderId,
     orderId: orderId,
-    menu_item_id: item.id || item.menuItemId,
     menuItemId: item.id || item.menuItemId,
     name: item.name,
     price: finalPrice,
     quantity: item.quantity || 1,
-    category_type: itemDept,
     categoryType: itemDept,
     note: item.note || '',
     restaurant_id: _restaurantId
