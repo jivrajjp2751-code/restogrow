@@ -6,6 +6,7 @@ import {
   createOrder, cancelOrder, createPrintJob
 } from '../store/data';
 import { Search, ArrowLeft, Printer, StickyNote, Edit3, XCircle } from 'lucide-react';
+import { printSplitKOT } from '../utils/print';
 
 export default function OrderPage() {
   const { tableId } = useParams();
@@ -128,9 +129,9 @@ export default function OrderPage() {
   const handlePrintKOT = async () => {
     if (!order || safeItems.length === 0) return;
     try {
-      await createPrintJob('KOT', { order, tableLabel: table?.label || table?.number });
-      addToast('Printing KOT...', 'info');
-    } catch { addToast('Print failed', 'error'); }
+      printSplitKOT(order, table?.label || table?.number, null, config);
+      addToast('Printing KOT...', 'success');
+    } catch (e) { addToast('Print failed: ' + e.message, 'error'); }
   };
 
   const handleCancelOrder = async () => {

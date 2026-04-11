@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
 import { generateBill, createPrintJob, cancelOrder } from '../store/data';
 import { CreditCard, Banknote, Smartphone, ArrowLeft, Printer, XCircle } from 'lucide-react';
+import { printBillDirect } from '../utils/print';
 
 export default function BillingPage() {
   const { orderId } = useParams();
@@ -57,9 +58,9 @@ export default function BillingPage() {
   const handlePrintBill = async () => {
     if (!generatedBill) return;
     try {
-      await createPrintJob('BILL', { bill: generatedBill });
-      addToast('Printing Bill...', 'info');
-    } catch { addToast('Print failed', 'error'); }
+      printBillDirect(generatedBill);
+      addToast('Printing Bill...', 'success');
+    } catch (e) { addToast('Print failed: ' + e.message, 'error'); }
   };
 
   const handleCancelOrder = async () => {
