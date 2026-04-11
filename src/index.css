@@ -1785,6 +1785,21 @@ ul, ol { list-style: none; }
   
   /* Settings page */
   .settings-grid { grid-template-columns: 1fr; }
+  
+  /* Order Page & Billing Page Overrides */
+  .order-layout, .billing-split-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    height: calc(100vh - 56px);
+  }
+  .order-panel, .billing-live-preview {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    max-height: 50vh;
+  }
+  .menu-items-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 
 /* ===== LOGIN & PIN KEYPAD ===== */

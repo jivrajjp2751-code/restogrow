@@ -38,6 +38,17 @@ export default function Sidebar() {
             <span className="sidebar-label">{item.label}</span>
           </NavLink>
         ))}
+        
+        {/* Mobile Logout Button (inside nav for scrolling) */}
+        <button 
+          className="sidebar-link" 
+          onClick={logout} 
+          title="Logout"
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--brand-danger)' }}
+        >
+          <LogOut size={18} />
+          <span className="sidebar-label">Logout</span>
+        </button>
       </nav>
 
       {/* Session indicator */}
@@ -46,17 +57,10 @@ export default function Sidebar() {
           width: '8px', height: '8px', borderRadius: '50%',
           background: 'var(--brand-success)',
           boxShadow: '0 0 6px var(--brand-success)',
-          margin: '4px 0',
+          margin: '4px 0 0 0',
           animation: 'pulse 2s infinite',
         }} title="Session Active" />
       )}
-
-      <div className="sidebar-footer">
-        <button className="theme-toggle" onClick={logout} title="Logout">
-          <LogOut size={14} />
-        </button>
-      </div>
-
     </aside>
   );
 }
