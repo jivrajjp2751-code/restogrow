@@ -30,12 +30,15 @@ export default function SettingsPage() {
   });
 
   const isAdmin = currentUser?.role === 'admin';
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setForm(f => ({ ...f, billLayout }));
   }, [billLayout]);
 
   const handleSave = async () => {
+    if (busy) return;
+    setBusy(true);
     try { 
       await updateConfig({ ...form, billLayout }); 
       localStorage.setItem('isPrintStation', isPrintStation);
@@ -43,6 +46,7 @@ export default function SettingsPage() {
       addToast('Settings saved', 'success'); 
     }
     catch { addToast('Failed', 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleReset = () => {
@@ -52,26 +56,7 @@ export default function SettingsPage() {
     }
   };
 
-  async function handleWipeData() {
-    if (!confirm("Are you sure? This will delete all Bills, Orders, and Sessions. This cannot be undone! Your Menu Items will NOT be deleted.")) return;
-    
-    const { supabase } = await import('../utils/supabase');
-    const rid = localStorage.getItem('rg_tenant_id');
-    if (!rid) return addToast("Error: Tenant ID not found", "error");
 
-    const tables = ['bill_items', 'bills', 'order_items', 'orders', 'sessions', 'print_jobs', 'inventory_log'];
-    
-    try {
-      for (const t of tables) {
-        await supabase.from(t).delete().eq('restaurant_id', rid);
-      }
-      await supabase.from('tables').update({ status: 'available' }).eq('restaurant_id', rid);
-      addToast("✅ Data wiped successfully. Ready for live use!", "success");
-      setTimeout(() => window.location.reload(), 2000);
-    } catch (e) {
-      addToast("Error clearing data: " + e.message, "error");
-    }
-  }
 
   // Preview data for bill layout
   const previewName = billLayout.restaurantName || form.restaurantName || 'YOUR RESTAURANT';
