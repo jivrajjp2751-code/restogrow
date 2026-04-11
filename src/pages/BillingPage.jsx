@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
-import { generateBill, createPrintJob } from '../store/data';
-import { printBillDirect } from '../utils/print';
-import { CreditCard, Banknote, Smartphone, ArrowLeft, Printer } from 'lucide-react';
+import { generateBill, createPrintJob, cancelOrder } from '../store/data';
+import { CreditCard, Banknote, Smartphone, ArrowLeft, Printer, XCircle } from 'lucide-react';
 
 export default function BillingPage() {
   const { orderId } = useParams();
@@ -15,6 +14,7 @@ export default function BillingPage() {
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [discount, setDiscount] = useState(0);
   const [generatedBill, setGeneratedBill] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   if (!order) {
     return (
@@ -35,12 +35,14 @@ export default function BillingPage() {
   const discountAmount = (subtotal * discount) / 100;
   const total = subtotal + totalTax + serviceCharge - discountAmount;
 
+  const billLayout = config.billLayout || {};
+
   const handleGenerateBill = async () => {
+    if (busy) return;
+    setBusy(true);
     try {
       const result = await generateBill(orderId, paymentMode, discount);
       if (result.bill) {
-        // Merge billLayout config into the bill object for printing
-        const billLayout = config.billLayout || {};
         result.bill.billLayout = billLayout;
         result.bill.cashierName = currentUser?.name || currentUser?.email || '';
         setGeneratedBill(result.bill);
@@ -49,6 +51,7 @@ export default function BillingPage() {
       }
       else addToast('Failed', 'error');
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
+    finally { setBusy(false); }
   };
 
   const handlePrintBill = async () => {
@@ -59,75 +62,194 @@ export default function BillingPage() {
     } catch { addToast('Print failed', 'error'); }
   };
 
-  const billLayout = config.billLayout || {};
+  const handleCancelOrder = async () => {
+    if (!confirm('Cancel this order? All items will be removed.')) return;
+    setBusy(true);
+    try {
+      await cancelOrder(order.id, order.tableId);
+      await refresh();
+      addToast('Order cancelled', 'info');
+      navigate('/tables');
+    } catch (e) { addToast('Cancel failed: ' + e.message, 'error'); }
+    finally { setBusy(false); }
+  };
 
-  if (generatedBill) {
-    const bSubtotal = generatedBill.subtotal || 0;
-    const bTaxRate = parseFloat(generatedBill.taxRate) || 0;
-    const bHalfRate = bTaxRate / 2;
-    const bSgst = Math.round((bSubtotal * bHalfRate) / 100 * 100) / 100;
-    const bCgst = Math.round((bSubtotal * bHalfRate) / 100 * 100) / 100;
-    const bDiscount = generatedBill.discountAmount || 0;
-    const bTotal = generatedBill.total || 0;
+  // Preview Data (either live or from DB)
+  const isGenerated = !!generatedBill;
+  const dRestaurantName = isGenerated ? generatedBill.restaurantName : (billLayout.restaurantName || config.restaurantName || 'RESTAURANT');
+  const dAddress = isGenerated ? generatedBill.restaurantAddress : (billLayout.address || config.address || '');
+  const dPhone = isGenerated ? generatedBill.restaurantPhone : (billLayout.phone || config.phone || '');
+  const dGstin = isGenerated ? generatedBill.gstNumber : (billLayout.gstin || config.gstNumber || '');
+  
+  const pSubtotal = isGenerated ? (generatedBill.subtotal || 0) : subtotal;
+  const pTaxRate = isGenerated ? (parseFloat(generatedBill.taxRate) || 0) : taxRate;
+  const pHalfRate = pTaxRate / 2;
+  const pSgst = isGenerated ? Math.round((pSubtotal * pHalfRate) / 100 * 100) / 100 : sgst;
+  const pCgst = isGenerated ? Math.round((pSubtotal * pHalfRate) / 100 * 100) / 100 : cgst;
+  const pDiscountAmount = isGenerated ? (generatedBill.discountAmount || 0) : discountAmount;
+  const pDiscountPercent = isGenerated ? generatedBill.discount : discount;
+  const pTotal = isGenerated ? (generatedBill.total || 0) : total;
+  const pItems = isGenerated ? generatedBill.items : order.items;
+  const pTableLabel = isGenerated ? generatedBill.tableNumber : order.tableNumber;
+  const pBillNumber = isGenerated ? generatedBill.billNumber : 'DRAFT';
+  const pDate = isGenerated ? new Date(generatedBill.createdAt || Date.now()).toLocaleString('en-IN') : new Date().toLocaleString('en-IN');
+  const pPaymentMode = isGenerated ? generatedBill.paymentMode : paymentMode;
+  const pCashierName = isGenerated ? generatedBill.cashierName : (currentUser?.name || 'CN');
 
-    return (
-      <div className="page-content">
-        <div style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>✓</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, marginBottom: '4px' }}>BILL GENERATED</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: '16px' }}>{generatedBill.billNumber}</div>
+  return (
+    <div className="page-content">
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1fr) 350px', gap: '24px', alignItems: 'start' }}>
+        
+        {/* LEFT COLUMN: Editor or Success */}
+        <div>
+          {isGenerated ? (
+             <div style={{ textAlign: 'center', padding: '40px 0' }}>
+               <div style={{ fontSize: '48px', color: 'var(--brand-success)', marginBottom: '16px' }}>✓</div>
+               <div style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>BILL GENERATED</div>
+               <div style={{ fontSize: '14px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: '32px' }}>{generatedBill.billNumber}</div>
+               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                 <button className="btn btn-secondary btn-lg" onClick={() => navigate('/tables')}>BACK TO TABLES</button>
+                 <button className="btn btn-success btn-lg" onClick={handlePrintBill}><Printer size={16} /> PRINT BILL</button>
+               </div>
+             </div>
+          ) : (
+             <>
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <button className="btn btn-ghost btn-icon" onClick={() => navigate(`/order/${order.tableId}`)}>
+                     <ArrowLeft size={16} />
+                   </button>
+                   <div className="page-title" style={{ borderBottom: 'none', paddingBottom: 0, margin: 0 }}>
+                     BILLING — {order.tableNumber}
+                   </div>
+                 </div>
+                 <button className="btn btn-ghost btn-sm" style={{ color: 'var(--brand-danger)' }} onClick={handleCancelOrder}>
+                   <XCircle size={14} style={{ marginRight: '4px' }} /> CANCEL ORDER
+                 </button>
+               </div>
 
-          {/* Bill Preview — thermal receipt style */}
-          <div className="bill-preview" style={{ marginBottom: '16px', textAlign: 'left' }}>
-            <div className="bill-header">
-              <div className="bill-restaurant-name">{generatedBill.restaurantName || billLayout.restaurantName || 'POS'}</div>
-              {(generatedBill.restaurantAddress || billLayout.address) && (
-                <div style={{ fontSize: '9px', color: '#333' }}>{generatedBill.restaurantAddress || billLayout.address}</div>
-              )}
-              {(generatedBill.restaurantPhone || billLayout.phone) && (
-                <div style={{ fontSize: '9px', color: '#333' }}>Phone: {generatedBill.restaurantPhone || billLayout.phone}</div>
-              )}
-              {(generatedBill.gstNumber || billLayout.gstin) && (
-                <div style={{ fontSize: '9px', color: '#444' }}>GSTIN: {generatedBill.gstNumber || billLayout.gstin}</div>
-              )}
-              {billLayout.sacCode && (
-                <div style={{ fontSize: '12px', fontWeight: 900, marginTop: '4px' }}>SAC {billLayout.sacCode}</div>
-              )}
-              {billLayout.serviceType && (
-                <div style={{ fontSize: '10px', fontWeight: 700 }}>[{billLayout.serviceType}]</div>
-              )}
-              <div style={{ fontSize: '11px', fontWeight: 800, marginTop: '2px' }}>[INVOICE]</div>
+               {/* Items Grid */}
+               <div className="card" style={{ marginBottom: '12px' }}>
+                 <div className="card-body" style={{ padding: 0 }}>
+                   <table className="data-table">
+                     <thead><tr><th>ITEM</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>PRICE</th><th style={{ textAlign: 'right' }}>VALUE</th></tr></thead>
+                     <tbody>
+                       {(order?.items || []).map(item => (
+                         <tr key={item.id}>
+                           <td style={{ fontWeight: 600 }}>{item.name}</td>
+                           <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{item.quantity}</td>
+                           <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{item.price}</td>
+                           <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{config.currency}{item.price * item.quantity}</td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
+               </div>
+
+               {/* Payment Methods */}
+               <div className="card" style={{ marginBottom: '12px' }}>
+                 <div className="card-body">
+                   <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)', marginBottom: '8px', color: 'var(--text-secondary)' }}>PAYMENT METHOD</div>
+                   <div className="payment-modes" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                     {[
+                       { mode: 'Cash', icon: Banknote },
+                       { mode: 'Card', icon: CreditCard },
+                       { mode: 'UPI', icon: Smartphone },
+                     ].map(p => (
+                       <button key={p.mode} type="button"
+                         className={`payment-mode-btn ${paymentMode === p.mode ? 'active' : ''}`}
+                         onClick={() => setPaymentMode(p.mode)}>
+                         <p.icon size={18} />
+                         <span>{p.mode}</span>
+                       </button>
+                     ))}
+                   </div>
+
+                   <div className="input-group" style={{ marginTop: '16px' }}>
+                     <label className="input-label">Discount (%)</label>
+                     <input type="number" className="input" value={discount}
+                       onChange={e => setDiscount(Math.max(0, Math.min(100, Number(e.target.value))))}
+                       min="0" max="100" />
+                   </div>
+                 </div>
+               </div>
+
+               {/* Financial Summary */}
+               <div className="card" style={{ marginBottom: '12px' }}>
+                 <div className="card-body">
+                   <div className="order-summary-row"><span>Subtotal</span><span>{config.currency}{subtotal.toFixed(2)}</span></div>
+                   {taxRate > 0 && (
+                     <>
+                       <div className="order-summary-row" style={{ fontSize: '11px' }}><span>SGST {halfTaxRate.toFixed(1)}%</span><span>{config.currency}{sgst.toFixed(2)}</span></div>
+                       <div className="order-summary-row" style={{ fontSize: '11px' }}><span>CGST {halfTaxRate.toFixed(1)}%</span><span>{config.currency}{cgst.toFixed(2)}</span></div>
+                     </>
+                   )}
+                   {config.serviceChargeRate > 0 && <div className="order-summary-row"><span>Service {config.serviceChargeRate}%</span><span>{config.currency}{Math.round(serviceCharge)}</span></div>}
+                   {discount > 0 && <div className="order-summary-row" style={{ color: 'var(--brand-success)' }}><span>Discount {discount}%</span><span>-{config.currency}{Math.round(discountAmount)}</span></div>}
+                   <div className="order-summary-row total"><span>TOTAL</span><span>{config.currency}{Math.round(total)}</span></div>
+                 </div>
+               </div>
+
+               <button className="btn btn-success btn-lg" style={{ width: '100%', fontSize: '14px' }} onClick={handleGenerateBill} disabled={busy}>
+                 COMPLETE — {config.currency}{Math.round(total)}
+               </button>
+             </>
+          )}
+        </div>
+
+        {/* RIGHT COLUMN: Live Bill Preview */}
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: 700, marginBottom: '6px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>
+            {isGenerated ? 'FINAL RECEIPT' : 'LIVE PREVIEW'}
+          </div>
+          
+          <div style={{
+            background: '#fff', color: '#000', padding: '14px', borderRadius: '8px',
+            fontFamily: "'Courier New', monospace", fontSize: '10px', lineHeight: '1.5',
+            border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)',
+            maxHeight: 'calc(100vh - 100px)', overflowY: 'auto'
+          }}>
+            <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '12px', marginBottom: '2px', textTransform: 'uppercase' }}>
+              {dRestaurantName}
+            </div>
+            {dAddress && <div style={{ textAlign: 'center', fontSize: '9px' }}>{dAddress}</div>}
+            {dPhone && <div style={{ textAlign: 'center', fontSize: '9px' }}>Phone: {dPhone}</div>}
+            {dGstin && <div style={{ textAlign: 'center', fontSize: '9px' }}>GSTIN: {dGstin}</div>}
+            {billLayout.sacCode && billLayout.showSACCode !== false && (
+              <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', marginTop: '2px' }}>SAC {billLayout.sacCode}</div>
+            )}
+            {billLayout.serviceType && (
+              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '10px' }}>[{billLayout.serviceType}]</div>
+            )}
+            <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', marginTop: '4px' }}>[INVOICE]</div>
+
+            <hr style={{ border: 'none', borderTop: '1px dotted #000', margin: '4px 0' }} />
+
+            <div>Bill No.: {pBillNumber}</div>
+            <div>Date : {pDate}</div>
+
+            <hr style={{ border: 'none', borderTop: '1px dotted #000', margin: '4px 0' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Table No.: {pTableLabel}</span>
+              {billLayout.showWaiter !== false && <span>Waiter: {(order.waiterCode || '')}</span>}
             </div>
 
-            <hr className="bill-divider" />
+            <hr style={{ border: 'none', borderTop: '1px dotted #000', margin: '4px 0' }} />
 
-            <div style={{ fontSize: '10px', padding: '2px 0' }}>Bill No.: {generatedBill.billNumber}</div>
-            <div style={{ fontSize: '10px', padding: '2px 0' }}>
-              Date: {new Date(generatedBill.createdAt || Date.now()).toLocaleString('en-IN')}
-            </div>
-
-            <hr className="bill-divider" />
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', padding: '2px 0' }}>
-              <span>Table: {generatedBill.tableNumber}</span>
-              <span>Waiter: {generatedBill.waiterCode || ''}</span>
-            </div>
-
-            <hr className="bill-divider" />
-
-            {/* Item table header */}
-            <div style={{ display: 'flex', fontSize: '10px', fontWeight: 700, padding: '2px 0', borderBottom: '1px dotted #999' }}>
+            <div style={{ display: 'flex', fontWeight: 700, fontSize: '9px', borderBottom: '1px dotted #000', paddingBottom: '2px' }}>
               <span style={{ flex: 2 }}>Item Name</span>
               <span style={{ flex: 1, textAlign: 'right' }}>Qty.</span>
               <span style={{ flex: 1, textAlign: 'right' }}>Price</span>
               <span style={{ flex: 1, textAlign: 'right' }}>Value</span>
             </div>
 
-            {(generatedBill.items || []).map((item, i) => {
+            {(pItems || []).map((item, i) => {
               const qty = item.quantity || 1;
               const price = item.price || 0;
               return (
-                <div key={i} style={{ display: 'flex', fontSize: '10px', padding: '2px 0', fontWeight: 600 }}>
+                <div key={i} style={{ display: 'flex', fontWeight: 700, padding: '2px 0' }}>
                   <span style={{ flex: 2, textTransform: 'uppercase' }}>{item.name}</span>
                   <span style={{ flex: 1, textAlign: 'right' }}>{qty.toFixed(2)}</span>
                   <span style={{ flex: 1, textAlign: 'right' }}>{price.toFixed(1)}</span>
@@ -136,139 +258,49 @@ export default function BillingPage() {
               );
             })}
 
-            <hr className="bill-divider" />
+            <hr style={{ border: 'none', borderTop: '1px dotted #000', margin: '4px 0' }} />
 
-            {/* Subtotal */}
-            <div className="bill-total-row"><span>SUB TOTAL</span><span>{bSubtotal.toFixed(2)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+              <span>SUB TOTAL</span><span>{pSubtotal.toFixed(2)}</span>
+            </div>
 
-            {/* Tax breakdown */}
-            {bTaxRate > 0 && (
+            {pTaxRate > 0 && (
               <>
-                <div style={{ fontSize: '10px', textAlign: 'right', padding: '1px 0' }}>
-                  Add S GST({bHalfRate.toFixed(3)}%) on {bSubtotal.toFixed(2)} <span style={{ marginLeft: '8px' }}>{bSgst.toFixed(2)}</span>
+                <div style={{ textAlign: 'right', fontSize: '9px' }}>
+                  Add S GST({pHalfRate.toFixed(3)}%) on {pSubtotal.toFixed(2)} <span style={{ marginLeft: '4px' }}>{pSgst.toFixed(2)}</span>
                 </div>
-                <div style={{ fontSize: '10px', textAlign: 'right', padding: '1px 0' }}>
-                  Add C GST({bHalfRate.toFixed(3)}%) on {bSubtotal.toFixed(2)} <span style={{ marginLeft: '8px' }}>{bCgst.toFixed(2)}</span>
+                <div style={{ textAlign: 'right', fontSize: '9px' }}>
+                  Add C GST({pHalfRate.toFixed(3)}%) on {pSubtotal.toFixed(2)} <span style={{ marginLeft: '4px' }}>{pCgst.toFixed(2)}</span>
                 </div>
               </>
             )}
 
-            {bDiscount > 0 && (
-              <div style={{ fontSize: '10px', textAlign: 'right', padding: '1px 0', color: '#00B894' }}>
-                Discount {generatedBill.discount}% <span style={{ marginLeft: '8px' }}>-{bDiscount.toFixed(2)}</span>
+            {pDiscountAmount > 0 && (
+              <div style={{ textAlign: 'right', fontSize: '9px' }}>
+                Discount {pDiscountPercent}% <span style={{ marginLeft: '4px' }}>-{pDiscountAmount.toFixed(2)}</span>
               </div>
             )}
 
-            <div className="bill-total-row" style={{ fontSize: '12px' }}>
-              <span>Amount Incl of All Taxes</span>
-              <span style={{ fontWeight: 900 }}>{bTotal.toFixed(2)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '11px', marginTop: '4px' }}>
+              <span>Amount Incl of All Taxes</span><span>{pTotal.toFixed(2)}</span>
             </div>
 
-            <hr className="bill-divider" />
+            <hr style={{ border: 'none', borderTop: '2px dashed #000', margin: '4px 0' }} />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginTop: '4px' }}>
-              <span>Cashier: {generatedBill.cashierName || ''}</span>
-              <span>Payment: {generatedBill.paymentMode}</span>
-            </div>
-
-            <div className="bill-footer">
-              <p style={{ fontWeight: 700 }}>{billLayout.footerLine1 || 'Thank you for your visit'}</p>
-              {(billLayout.footerLine2 || 'Have a nice day') && <p style={{ fontWeight: 700 }}>{billLayout.footerLine2 || 'Have a nice day'}</p>}
-              {billLayout.footerLine3 && <p style={{ fontSize: '9px', marginTop: '4px' }}>{billLayout.footerLine3}</p>}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn btn-secondary btn-lg" style={{ flex: 1 }} onClick={() => navigate('/tables')}>
-              TABLES
-            </button>
-            <button className="btn btn-primary btn-lg" style={{ flex: 1 }} onClick={handlePrintBill}>
-              <Printer size={14} /> PRINT
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="page-content">
-      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-          <button className="btn btn-ghost btn-icon" onClick={() => navigate(`/order/${order.tableId}`)}>
-            <ArrowLeft size={16} />
-          </button>
-          <div className="page-title" style={{ borderBottom: 'none', paddingBottom: 0 }}>
-            BILLING — {order.tableNumber}
-          </div>
-        </div>
-
-        {/* Items */}
-        <div className="card" style={{ marginBottom: '12px' }}>
-          <div className="card-body" style={{ padding: 0 }}>
-            <table className="data-table">
-              <thead><tr><th>ITEM</th><th>QTY</th><th>PRICE</th><th>VALUE</th></tr></thead>
-              <tbody>
-                {(order?.items || []).map(item => (
-                  <tr key={item.id}>
-                    <td style={{ fontWeight: 600 }}>{item.name}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{item.quantity}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{config.currency}{item.price}</td>
-                    <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{config.currency}{item.price * item.quantity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Payment */}
-        <div className="card" style={{ marginBottom: '12px' }}>
-          <div className="card-body">
-            <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)', marginBottom: '8px', color: 'var(--text-secondary)' }}>PAYMENT METHOD</div>
-            <div className="payment-modes">
-              {[
-                { mode: 'Cash', icon: Banknote },
-                { mode: 'Card', icon: CreditCard },
-                { mode: 'UPI', icon: Smartphone },
-              ].map(p => (
-                <button key={p.mode}
-                  className={`payment-mode-btn ${paymentMode === p.mode ? 'active' : ''}`}
-                  onClick={() => setPaymentMode(p.mode)}>
-                  <p.icon size={18} />
-                  <span>{p.mode}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="input-group">
-              <label className="input-label">Discount (%)</label>
-              <input type="number" className="input" value={discount}
-                onChange={e => setDiscount(Math.max(0, Math.min(100, Number(e.target.value))))}
-                min="0" max="100" />
-            </div>
-          </div>
-        </div>
-
-        {/* Total */}
-        <div className="card" style={{ marginBottom: '12px' }}>
-          <div className="card-body">
-            <div className="order-summary-row"><span>Subtotal</span><span>{config.currency}{subtotal.toFixed(2)}</span></div>
-            {taxRate > 0 && (
-              <>
-                <div className="order-summary-row" style={{ fontSize: '11px' }}><span>SGST {halfTaxRate.toFixed(1)}%</span><span>{config.currency}{sgst.toFixed(2)}</span></div>
-                <div className="order-summary-row" style={{ fontSize: '11px' }}><span>CGST {halfTaxRate.toFixed(1)}%</span><span>{config.currency}{cgst.toFixed(2)}</span></div>
-              </>
+            {billLayout.showCashier !== false && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                <span>Cashier : {pCashierName}</span><span>{pPaymentMode}</span>
+              </div>
             )}
-            {config.serviceChargeRate > 0 && <div className="order-summary-row"><span>Service {config.serviceChargeRate}%</span><span>{config.currency}{Math.round(serviceCharge)}</span></div>}
-            {discount > 0 && <div className="order-summary-row" style={{ color: 'var(--brand-success)' }}><span>Discount {discount}%</span><span>-{config.currency}{Math.round(discountAmount)}</span></div>}
-            <div className="order-summary-row total"><span>TOTAL</span><span>{config.currency}{Math.round(total)}</span></div>
+
+            <div style={{ textAlign: 'center', marginTop: '6px', fontWeight: 700 }}>
+               {billLayout.footerLine1 || 'Thank you for your visit'}
+            </div>
+            {billLayout.footerLine2 && <div style={{ textAlign: 'center', fontWeight: 700 }}>{billLayout.footerLine2}</div>}
+            {billLayout.footerLine3 && <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '2px' }}>{billLayout.footerLine3}</div>}
           </div>
         </div>
 
-        <button className="btn btn-success btn-lg" style={{ width: '100%', fontSize: '14px' }} onClick={handleGenerateBill}>
-          COMPLETE — {config.currency}{Math.round(total)}
-        </button>
       </div>
     </div>
   );

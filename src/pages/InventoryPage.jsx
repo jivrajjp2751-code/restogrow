@@ -107,8 +107,8 @@ export default function InventoryPage() {
     <div className="page-content">
       <div className="page-header">
         <div className="page-title"><Package size={16} /> INVENTORY</div>
-        <div className="page-actions" style={{ display: 'flex', gap: '8px' }}>
-          <div className="search-pill">
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <div className="search-pill" style={{ margin: 0 }}>
             <Search size={14} />
             <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
@@ -140,8 +140,7 @@ export default function InventoryPage() {
                       <tr>
                         <th>ITEM</th>
                         <th>CODE</th>
-                        <th>BUYING</th>
-                        <th>SELLING</th>
+                        <th>PRICE</th>
                         <th>STOCK</th>
                         <th>STATUS</th>
                         <th>ACTIONS</th>
@@ -152,8 +151,7 @@ export default function InventoryPage() {
                         <tr key={item.id}>
                           <td style={{ fontWeight: 600 }}>{item.name}</td>
                           <td><code style={{ fontSize: '10px', padding: '1px 4px', background: 'var(--bg-tertiary)', borderRadius: '2px', fontFamily: 'var(--font-mono)' }}>{item.code}</code></td>
-                          <td style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{config.currency}{item.buyingPrice || 0}</td>
-                          <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--brand-success)' }}>{config.currency}{item.price}</td>
+                          <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{config.currency}{item.price}</td>
                           <td>
                             <div className="stock-indicator">
                               <div className="stock-bar">
