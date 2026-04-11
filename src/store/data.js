@@ -246,12 +246,13 @@ export async function addItemToOrder(orderId, item) {
   const finalPrice = Math.round((item.price || 0) * surchargeFactor);
 
   const payload = {
-    orderId,
-    menuItemId: item.id || item.menuItemId,
+    order_id: orderId,
+    orderId: orderId, // Defensive
+    menu_item_id: item.id || item.menuItemId,
     name: item.name,
     price: finalPrice,
     quantity: item.quantity || 1,
-    categoryType: itemDept,
+    category_type: itemDept,
     note: item.note || '',
     restaurant_id: _restaurantId
   };
@@ -351,10 +352,11 @@ export async function generateBill(orderId, paymentMode, discount) {
 
 export async function getOrderForTable(tableId) {
   if (!_restaurantId) return null;
+  // Try both table_id and tableId to be safe
   const { data: orders, error } = await supabase.from('orders')
     .select('*')
     .eq('restaurant_id', _restaurantId)
-    .eq('tableId', tableId)
+    .or(`tableId.eq.${tableId},table_id.eq.${tableId}`)
     .eq('status', 'active')
     .limit(1);
     
@@ -362,8 +364,18 @@ export async function getOrderForTable(tableId) {
   if (error || !orders || orders.length === 0) return null;
   const order = orders[0];
   
-  const { data: items } = await supabase.from('order_items').select('*').eq('orderId', order.id);
-  order.items = items || [];
+  // Normalize IDs
+  order.id = order.id || order.order_id;
+  
+  const { data: items } = await supabase.from('order_items')
+    .select('*')
+    .or(`orderId.eq.${order.id},order_id.eq.${order.id}`);
+    
+  order.items = (items || []).map(i => ({
+    ...i,
+    quantity: i.quantity || i.qty || 0,
+    price: i.price || 0
+  }));
   return order;
 }
 
