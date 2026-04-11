@@ -128,7 +128,6 @@ export default function StaffMobileDashboard() {
     }
   };
 
-  const subtotal = order?.items?.reduce((s, i) => s + ((i.price || 0) * (i.quantity || 0)), 0) || 0;
 
   if (!selectedTableId) {
     return (
