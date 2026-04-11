@@ -9,18 +9,19 @@ export default function InventoryPage() {
   const isAdmin = currentUser?.role === 'admin';
 
   const [activeTab, setActiveTab] = useState('stock');
+  const [selectedDeptTab, setSelectedDeptTab] = useState('kitchen');
   const [searchQuery, setSearchQuery] = useState('');
   const [stockModal, setStockModal] = useState(null);
   const [addQty, setAddQty] = useState('');
   const [addItemModal, setAddItemModal] = useState(null); // department ID
   const [newItemForm, setNewItemForm] = useState({
-    name: '', code: '', price: '', buyingPrice: '', deptId: '', stock: '50', unit: 'bottle', isVeg: true,
+    name: '', code: '', price: '', buyingPrice: '', deptId: '', stock: '50', unit: 'bottle', isVeg: true, isTracked: true
   });
 
   // Edit item modal state
   const [editItemModal, setEditItemModal] = useState(null);
   const [editItemForm, setEditItemForm] = useState({
-    name: '', code: '', price: '', buyingPrice: '', stock: '',
+    name: '', code: '', price: '', buyingPrice: '', stock: '', isTracked: true
   });
 
   const lowStockItems = useMemo(() => getLowStockItems(menuItems), [menuItems]);
@@ -42,10 +43,11 @@ export default function InventoryPage() {
   };
 
   const openAddItem = useCallback((deptId) => {
+    const defaultTrack = deptId === 'bar';
     setNewItemForm({
       name: '', code: `ITM${Date.now().toString().slice(-4)}`,
       price: '', buyingPrice: '', deptId: deptId,
-      stock: '50', unit: deptId === 'bar' ? 'bottle' : 'plate', isVeg: true,
+      stock: defaultTrack ? '50' : '-999', unit: deptId === 'bar' ? 'bottle' : 'plate', isVeg: true, isTracked: defaultTrack
     });
     setAddItemModal(deptId);
   }, []);
@@ -57,7 +59,7 @@ export default function InventoryPage() {
         ...newItemForm,
         price: Number(newItemForm.price),
         buyingPrice: Number(newItemForm.buyingPrice) || 0,
-        stock: Number(newItemForm.stock) || 0,
+        stock: newItemForm.isTracked ? (Number(newItemForm.stock) || 0) : -999,
       });
       refresh();
       addToast(`${newItemForm.name} added`, 'success');
@@ -80,7 +82,8 @@ export default function InventoryPage() {
       code: item.code || '',
       price: item.price || '',
       buyingPrice: item.buyingPrice || '',
-      stock: item.stock || 0,
+      stock: item.stock === -999 ? '50' : (item.stock || 0),
+      isTracked: item.stock !== -999
     });
     setEditItemModal(item);
   };
@@ -94,7 +97,7 @@ export default function InventoryPage() {
         code: editItemForm.code,
         price: Number(editItemForm.price),
         buyingPrice: Number(editItemForm.buyingPrice) || 0,
-        stock: Number(editItemForm.stock) || 0,
+        stock: editItemForm.isTracked ? (Number(editItemForm.stock) || 0) : -999,
         deptId: editItemModal.deptId,
       });
       refresh();
@@ -122,8 +125,28 @@ export default function InventoryPage() {
 
       {activeTab === 'stock' && (
         <div className="inventory-grid">
+          {!searchQuery && (
+            <div className="category-tabs" style={{ marginBottom: '12px' }}>
+              {(config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}]).map(dept => (
+                <button 
+                  key={dept.id} 
+                  className={`category-tab ${selectedDeptTab === dept.id || (!selectedDeptTab && dept.id==='kitchen') ? 'active' : ''}`} 
+                  onClick={() => setSelectedDeptTab(dept.id)}
+                >
+                  {dept.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="inventory-sections">
-            {(config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}]).map(dept => {
+            {(config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])
+              .filter(dept => {
+                if (searchQuery) {
+                  return searchFiltered.some(i => i.deptId === dept.id || (!i.deptId && dept.id === 'bar'));
+                }
+                return selectedDeptTab === dept.id || (!selectedDeptTab && dept.id === 'kitchen');
+              })
+              .map(dept => {
               const deptItems = searchFiltered.filter(i => i.deptId === dept.id || (!i.deptId && dept.id === 'bar'));
               return (
                 <div className="inventory-section" key={dept.id}>
@@ -153,19 +176,23 @@ export default function InventoryPage() {
                           <td><code style={{ fontSize: '10px', padding: '1px 4px', background: 'var(--bg-tertiary)', borderRadius: '2px', fontFamily: 'var(--font-mono)' }}>{item.code}</code></td>
                           <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{config.currency}{item.price}</td>
                           <td>
-                            <div className="stock-indicator">
-                              <div className="stock-bar">
-                                <div className={`stock-bar-fill ${item.stock > 30 ? 'high' : item.stock > 10 ? 'medium' : 'low'}`} style={{ width: `${Math.min(100, (item.stock / 100) * 100)}%` }} />
+                            {item.stock !== -999 ? (
+                              <div className="stock-indicator">
+                                <div className="stock-bar">
+                                  <div className={`stock-bar-fill ${item.stock > 30 ? 'high' : item.stock > 10 ? 'medium' : 'low'}`} style={{ width: `${Math.min(100, (item.stock / 100) * 100)}%` }} />
+                                </div>
+                                <span style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{item.stock}</span>
                               </div>
-                              <span style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{item.stock}</span>
-                            </div>
+                            ) : '-'}
                           </td>
                           <td>
-                            {item.stock <= 0 ? <span className="badge badge-danger">OUT</span> : item.stock <= 10 ? <span className="badge badge-warning">LOW</span> : <span className="badge badge-success">OK</span>}
+                            {item.stock === -999 ? '-' : item.stock <= 0 ? <span className="badge badge-danger">OUT</span> : item.stock <= 10 ? <span className="badge badge-warning">LOW</span> : <span className="badge badge-success">OK</span>}
                           </td>
                           <td>
                             <div style={{ display: 'flex', gap: '4px' }}>
-                              <button className="btn btn-sm btn-secondary" onClick={() => { setStockModal(item); setAddQty(''); }}>+ STOCK</button>
+                              {item.stock !== -999 && (
+                                <button className="btn btn-sm btn-secondary" onClick={() => { setStockModal(item); setAddQty(''); }}>+ STOCK</button>
+                              )}
                               <button className="btn btn-sm btn-ghost" title="Edit item" onClick={() => openEditItem(item)}><Edit3 size={12} /></button>
                               <button className="btn btn-sm btn-ghost" style={{ color: 'var(--brand-danger)' }} title="Delete item" onClick={() => handleDeleteItem(item)}><Trash2 size={12} /></button>
                             </div>
@@ -271,9 +298,17 @@ export default function InventoryPage() {
                   <input type="number" className="input" value={newItemForm.buyingPrice} onChange={e => setNewItemForm(f => ({ ...f, buyingPrice: e.target.value }))} />
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Stock</label>
-                  <input type="number" className="input" value={newItemForm.stock} onChange={e => setNewItemForm(f => ({ ...f, stock: e.target.value }))} />
+                  <label className="input-label" style={{display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '8px'}}>
+                    <input type="checkbox" checked={newItemForm.isTracked} onChange={e => setNewItemForm(f => ({ ...f, isTracked: e.target.checked }))} style={{width: '14px', height: '14px'}} />
+                    Track Inventory / Stock for this item
+                  </label>
                 </div>
+                {newItemForm.isTracked && (
+                  <div className="input-group">
+                    <label className="input-label">Initial Stock</label>
+                    <input type="number" className="input" value={newItemForm.stock === '-999' ? '50' : newItemForm.stock} onChange={e => setNewItemForm(f => ({ ...f, stock: e.target.value }))} />
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
@@ -311,9 +346,17 @@ export default function InventoryPage() {
                   <input type="number" className="input" value={editItemForm.buyingPrice} onChange={e => setEditItemForm(f => ({ ...f, buyingPrice: e.target.value }))} />
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Current Stock</label>
-                  <input type="number" className="input" value={editItemForm.stock} onChange={e => setEditItemForm(f => ({ ...f, stock: e.target.value }))} />
+                  <label className="input-label" style={{display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '8px'}}>
+                    <input type="checkbox" checked={editItemForm.isTracked} onChange={e => setEditItemForm(f => ({ ...f, isTracked: e.target.checked }))} style={{width: '14px', height: '14px'}} />
+                    Track Inventory / Stock for this item
+                  </label>
                 </div>
+                {editItemForm.isTracked && (
+                  <div className="input-group">
+                    <label className="input-label">Current Stock</label>
+                    <input type="number" className="input" value={editItemForm.stock} onChange={e => setEditItemForm(f => ({ ...f, stock: e.target.value }))} />
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
