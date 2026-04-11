@@ -117,9 +117,7 @@ export default function InventoryPage() {
             <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
           <div className="tab-pills">
-            <button className={`tab-pill ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>STOCK</button>
             <button className={`tab-pill ${activeTab === 'low' ? 'active' : ''}`} onClick={() => setActiveTab('low')}>LOW STOCK {lowStockItems.length > 0 && <span className="badge badge-danger" style={{marginLeft:'4px'}}>{lowStockItems.length}</span>}</button>
-            <button className={`tab-pill ${activeTab === 'log' ? 'active' : ''}`} onClick={() => setActiveTab('log')}>LOGS</button>
           </div>
         </div>
       </div>
@@ -235,22 +233,7 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {activeTab === 'log' && (
-        <div className="card">
-          <div className="section-header"><h3 className="section-title">INVENTORY TRANSACTION LOG</h3></div>
-          <div className="log-list">
-            {inventoryLog.map(log => (
-              <div key={log.id} className="log-item">
-                <div className="log-icon">{log.qty > 0 ? <Plus size={14} color="var(--brand-success)" /> : <Trash2 size={14} color="var(--brand-danger)" />}</div>
-                <div className="log-details">
-                  <div className="log-msg"><strong>{log.itemName}</strong>: {log.qty > 0 ? '+' : ''}{log.qty} {log.reason}</div>
-                  <div className="log-time">{new Date(log.createdAt).toLocaleString()}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {/* Modals */}
       {stockModal && (
