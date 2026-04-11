@@ -180,7 +180,8 @@ export default function StaffMobileDashboard() {
     <div className="staff-mobile">
       <div className="staff-order-header">
         <button className="staff-back-btn" onClick={() => setSelectedTableId(null)}><ArrowLeft size={18} /></button>
-        <div style={{ flex: 1, fontWeight: 700 }}>{selectedTable?.label}</div>
+        <div style={{ flex: 1, fontWeight: 700 }}>{selectedTable?.label} <span style={{fontSize:'8px', opacity:0.5}}>V2.0</span></div>
+        <button className="btn btn-ghost btn-sm" onClick={loadOrder} disabled={busy}><RefreshCw size={14} className={busy ? 'spin' : ''} /></button>
       </div>
 
       <div className="staff-menu-search">
@@ -205,15 +206,17 @@ export default function StaffMobileDashboard() {
         ))}
       </div>
 
-      {order?.items?.length > 0 && (
-        <div className="staff-order-drawer">
+      {/* FORCE DRAWER VISIBILITY FOR TESTING IF EMPTY */}
+      {order && (
+        <div className="staff-order-drawer" style={{ borderTop: '4px solid var(--brand-primary)' }}>
           <div className="staff-drawer-header">
-            <span className="staff-drawer-title">CURRENT ORDER ({order.items.length})</span>
+            <span className="staff-drawer-title">ORDER SUMMARY ({order.items?.length || 0})</span>
             <span className="staff-drawer-subtotal">{config.currency}{subtotal}</span>
           </div>
           
           <div className="staff-item-list">
-            {order.items.map(item => (
+            {(order.items || []).length === 0 && <div style={{textAlign:'center', padding: '10px', fontSize:'11px', color:'#999'}}>No items added yet. Tap items above!</div>}
+            {(order.items || []).map(item => (
               <div key={item.id} className="staff-drawer-item">
                 <div className="staff-item-info">
                   <div className="staff-item-name">{item.name}</div>
@@ -229,7 +232,7 @@ export default function StaffMobileDashboard() {
           </div>
 
           <div className="staff-drawer-actions">
-            <button className="btn btn-primary btn-lg" onClick={handlePrintKOT} disabled={busy} style={{ width: '100%', height: '48px', gap: '10px' }}>
+            <button className="btn btn-primary btn-lg" onClick={handlePrintKOT} disabled={busy || !order.items?.length} style={{ width: '100%', height: '48px', gap: '10px' }}>
                <Printer size={18} /> {busy ? 'Printing...' : 'PRINT KOT'}
             </button>
           </div>
