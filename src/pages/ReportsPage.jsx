@@ -50,8 +50,8 @@ export default function ReportsPage() {
     }
   });
 
-  // Monthly most sold liquor
-  const mostSoldLiquor = reportType === 'monthly' ? getMostSoldLiquor(selectedMonth, bills) : [];
+  // Monthly most sold items
+  const mostSoldLiquor = reportType === 'monthly' ? getMostSoldLiquor(selectedMonth, bills, null, config) : [];
 
   // Department Breakdown
   const deptSales = {};

@@ -20,11 +20,16 @@ const DEFAULT_BILL_LAYOUT = {
 };
 
 export default function SettingsPage() {
-  const { config = {}, refresh, sections = [] } = useApp();
+  const { config = {}, refresh, sections = [], currentUser } = useApp();
   const { addToast } = useToast();
   const [form, setForm] = useState({ ...config });
   const [billLayout, setBillLayout] = useState({ ...DEFAULT_BILL_LAYOUT, ...(config.billLayout || {}) });
   const [isPrintStation, setIsPrintStation] = useState(localStorage.getItem('isPrintStation') === 'true');
+  const [editItemForm, setEditItemForm] = useState({
+    name: '', code: '', price: '', buyingPrice: '', stock: '', isTracked: true, section_ids: []
+  });
+
+  const isAdmin = currentUser?.role === 'admin';
 
   useEffect(() => {
     setForm(f => ({ ...f, billLayout }));
@@ -46,6 +51,27 @@ export default function SettingsPage() {
       window.location.reload();
     }
   };
+
+  async function handleWipeData() {
+    if (!confirm("Are you sure? This will delete all Bills, Orders, and Sessions. This cannot be undone! Your Menu Items will NOT be deleted.")) return;
+    
+    const { supabase } = await import('../utils/supabase');
+    const rid = localStorage.getItem('rg_tenant_id');
+    if (!rid) return addToast("Error: Tenant ID not found", "error");
+
+    const tables = ['bill_items', 'bills', 'order_items', 'orders', 'sessions', 'print_jobs', 'inventory_log'];
+    
+    try {
+      for (const t of tables) {
+        await supabase.from(t).delete().eq('restaurant_id', rid);
+      }
+      await supabase.from('tables').update({ status: 'available' }).eq('restaurant_id', rid);
+      addToast("✅ Data wiped successfully. Ready for live use!", "success");
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (e) {
+      addToast("Error clearing data: " + e.message, "error");
+    }
+  }
 
   // Preview data for bill layout
   const previewName = billLayout.restaurantName || form.restaurantName || 'YOUR RESTAURANT';
@@ -335,9 +361,50 @@ export default function SettingsPage() {
 
       <div className="config-section" style={{ borderColor: 'rgba(255,107,107,0.3)' }}>
         <h3 className="config-section-title" style={{ color: 'var(--brand-danger)' }}><RefreshCw size={14} /> DANGER ZONE</h3>
-        <p style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '10px' }}>Reset clears ALL data.</p>
-        <button className="btn btn-danger" onClick={handleReset}>RESET ALL DATA</button>
+        <p style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '10px' }}>
+          <b>START LIVE:</b> This will delete all trial bills, sessions, and orders but KEEP your menu items and settings. Use this before your official opening.
+        </p>
+        <button className="btn btn-danger" onClick={handleWipeData} style={{ marginRight: '8px', background: '#ff4757' }}>WIPE TRIAL DATA (START LIVE)</button>
+        <button className="btn btn-ghost" onClick={handleReset} style={{ color: 'var(--brand-danger)', fontSize: '11px' }}>RESET ALL DATA</button>
       </div>
     </div>
   );
+
+  async function handleWipeData() {
+    if (!confirm("🚨 DANGER: This will delete ALL Bills, Orders, and Sessions. Your Menu Items and Categories will be safe. Start Live now?")) return;
+    
+    setBusy(true);
+    const { supabase } = await import('../utils/supabase');
+    const rid = localStorage.getItem('rg_tenant_id');
+    if (!rid) {
+      addToast("Error: Tenant ID not found", "error");
+      setBusy(false);
+      return;
+    }
+
+    // Explicit order: items first to avoid foreign key errors
+    const tables = ['bill_items', 'order_items', 'print_jobs', 'inventory_log', 'bills', 'orders', 'sessions'];
+    
+    try {
+      console.log("🧹 Wiping transactional data for tenant:", rid);
+      for (const t of tables) {
+        const { error } = await supabase.from(t).delete().eq('restaurant_id', rid);
+        if (error) {
+          console.warn(`⚠️ Table ${t} wipe failed or skipped:`, error.message);
+        } else {
+          console.log(`✅ Table ${t} cleared`);
+        }
+      }
+      
+      // Force table status reset
+      await supabase.from('tables').update({ status: 'available' }).eq('restaurant_id', rid);
+      
+      addToast("✨ PREPARATION COMPLETE: System is now LIVE & Clean!", "success");
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (e) {
+      addToast("Wipe failed: " + e.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
 }

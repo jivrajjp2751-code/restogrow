@@ -535,7 +535,13 @@ export function getMonthBills(month, bills) {
   });
 }
 
-export function getMostSoldLiquor(month, bills) {
+export function getMostSoldLiquor(month, bills, _unused, config = {}) {
+  const barDepts = (config.departments || []).filter(d => 
+    d.name.toLowerCase().includes('bar') || 
+    d.name.toLowerCase().includes('bev') || 
+    d.name.toLowerCase().includes('liquor')
+  ).map(d => d.id);
+  
   if (!bills) return [];
   const monthBills = bills.filter(b => {
     const d = b.createdAt || b.created_at;
@@ -544,7 +550,10 @@ export function getMostSoldLiquor(month, bills) {
   const itemMap = {};
   monthBills.forEach(bill => {
     (bill.items || []).forEach(item => {
-      if (item.categoryType === 'kitchen') return;
+      // Include if it matches a bar/bev department ID or has a legacy 'bar' categoryType
+      const isBar = barDepts.includes(item.deptId) || barDepts.includes(item.categoryType) || item.categoryType === 'bar';
+      if (!isBar) return;
+      
       const key = item.name;
       if (!itemMap[key]) itemMap[key] = { name: item.name, qty: 0, revenue: 0 };
       itemMap[key].qty += item.quantity;
