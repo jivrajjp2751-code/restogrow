@@ -45,9 +45,11 @@ export default function StaffMobileDashboard() {
     return (menuItems || []).filter(i => {
       const matchDept = i.deptId === activeDeptId || (!i.deptId && activeDeptId === 'bar');
       const matchSearch = !q || i.name?.toLowerCase().includes(q) || i.code?.toLowerCase().includes(q);
-      return matchDept && matchSearch;
+      const isAllowedSection = (!i.section_ids || i.section_ids.length === 0) 
+        || (selectedTable?.sectionId && i.section_ids.includes(selectedTable.sectionId));
+      return matchDept && matchSearch && isAllowedSection;
     });
-  }, [menuItems, activeDeptId, searchQuery]);
+  }, [menuItems, activeDeptId, searchQuery, selectedTable]);
 
   const handleTableClick = (table) => {
     if (!currentSession) { addToast('Start a session first!', 'warning'); return; }

@@ -61,9 +61,11 @@ export default function OrderPage() {
     return (menuItems || []).filter(i => {
       const matchDept = i.deptId === activeDeptId || (!i.deptId && activeDeptId === 'bar');
       const matchSearch = !q || i.name?.toLowerCase().includes(q) || i.code?.toLowerCase().includes(q);
-      return matchDept && matchSearch;
+      const isAllowedSection = (!i.section_ids || i.section_ids.length === 0) 
+        || (table?.sectionId && i.section_ids.includes(table.sectionId));
+      return matchDept && matchSearch && isAllowedSection;
     });
-  }, [menuItems, activeDeptId, q]);
+  }, [menuItems, activeDeptId, q, table]);
 
   // Check if surcharge is applicable for a given dept
   const isSurchargeApplicable = useCallback((deptId) => {

@@ -4,7 +4,7 @@ import { addStock, addMenuItem, deleteMenuItem, updateMenuItem, getInventoryLog,
 import { Package, AlertTriangle, Plus, Search, Wine, Coffee, Trash2, Edit3 } from 'lucide-react';
 
 export default function InventoryPage() {
-  const { menuItems = [], inventory_log = [], config = {}, refresh, currentUser } = useApp();
+  const { menuItems = [], inventory_log = [], config = {}, refresh, currentUser, sections = [] } = useApp();
   const { addToast } = useToast();
   const isAdmin = currentUser?.role === 'admin';
 
@@ -15,13 +15,13 @@ export default function InventoryPage() {
   const [addQty, setAddQty] = useState('');
   const [addItemModal, setAddItemModal] = useState(null); // department ID
   const [newItemForm, setNewItemForm] = useState({
-    name: '', code: '', price: '', buyingPrice: '', deptId: '', stock: '50', unit: 'bottle', isVeg: true, isTracked: true
+    name: '', code: '', price: '', buyingPrice: '', deptId: '', stock: '50', unit: 'bottle', isVeg: true, isTracked: true, section_ids: []
   });
 
   // Edit item modal state
   const [editItemModal, setEditItemModal] = useState(null);
   const [editItemForm, setEditItemForm] = useState({
-    name: '', code: '', price: '', buyingPrice: '', stock: '', isTracked: true
+    name: '', code: '', price: '', buyingPrice: '', stock: '', isTracked: true, section_ids: []
   });
 
   const lowStockItems = useMemo(() => getLowStockItems(menuItems), [menuItems]);
@@ -47,7 +47,7 @@ export default function InventoryPage() {
     setNewItemForm({
       name: '', code: `ITM${Date.now().toString().slice(-4)}`,
       price: '', buyingPrice: '', deptId: deptId,
-      stock: defaultTrack ? '50' : '-999', unit: deptId === 'bar' ? 'bottle' : 'plate', isVeg: true, isTracked: defaultTrack
+      stock: defaultTrack ? '50' : '-999', unit: deptId === 'bar' ? 'bottle' : 'plate', isVeg: true, isTracked: defaultTrack, section_ids: []
     });
     setAddItemModal(deptId);
   }, []);
@@ -83,7 +83,8 @@ export default function InventoryPage() {
       price: item.price || '',
       buyingPrice: item.buyingPrice || '',
       stock: item.stock === -999 ? '50' : (item.stock || 0),
-      isTracked: item.stock !== -999
+      isTracked: item.stock !== -999,
+      section_ids: item.section_ids || []
     });
     setEditItemModal(item);
   };
@@ -310,6 +311,23 @@ export default function InventoryPage() {
                   </div>
                 )}
               </div>
+              <div className="input-group" style={{marginTop:'12px'}}>
+                <label className="input-label">Show only in specific sections (Optional)</label>
+                <div style={{display:'flex', flexWrap:'wrap', gap:'8px', background:'var(--bg-tertiary)', padding:'8px', borderRadius:'8px', border:'1px solid var(--border-color)'}}>
+                   {sections.map(s => (
+                     <label key={s.id} style={{fontSize:'11px', display:'flex', alignItems:'center', gap:'4px', cursor:'pointer'}}>
+                       <input type="checkbox" checked={newItemForm.section_ids.includes(s.id)} onChange={e => {
+                         const ids = e.target.checked 
+                           ? [...newItemForm.section_ids, s.id]
+                           : newItemForm.section_ids.filter(id => id !== s.id);
+                         setNewItemForm(f => ({...f, section_ids: ids}));
+                       }} />
+                       {s.name}
+                     </label>
+                   ))}
+                   {sections.length === 0 && <span style={{fontSize:'10px', color:'var(--text-tertiary)'}}>No sections found</span>}
+                </div>
+              </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setAddItemModal(null)}>Cancel</button>
@@ -357,6 +375,22 @@ export default function InventoryPage() {
                     <input type="number" className="input" value={editItemForm.stock} onChange={e => setEditItemForm(f => ({ ...f, stock: e.target.value }))} />
                   </div>
                 )}
+              </div>
+              <div className="input-group" style={{marginTop:'12px'}}>
+                <label className="input-label">Show only in specific sections (Optional)</label>
+                <div style={{display:'flex', flexWrap:'wrap', gap:'8px', background:'var(--bg-tertiary)', padding:'8px', borderRadius:'8px', border:'1px solid var(--border-color)'}}>
+                   {sections.map(s => (
+                     <label key={s.id} style={{fontSize:'11px', display:'flex', alignItems:'center', gap:'4px', cursor:'pointer'}}>
+                       <input type="checkbox" checked={editItemForm.section_ids.includes(s.id)} onChange={e => {
+                         const ids = e.target.checked 
+                           ? [...editItemForm.section_ids, s.id]
+                           : editItemForm.section_ids.filter(id => id !== s.id);
+                         setEditItemForm(f => ({...f, section_ids: ids}));
+                       }} />
+                       {s.name}
+                     </label>
+                   ))}
+                </div>
               </div>
             </div>
             <div className="modal-footer">

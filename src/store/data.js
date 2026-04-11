@@ -189,12 +189,12 @@ export async function deleteTable(id) { return dbDelete('tables', id); }
 // Category management removed - items linked to departments directly
 
 export async function addMenuItem(data) { 
-  const { name, code, price, buyingPrice, stock, deptId } = data;
-  return dbInsert('menu_items', { name, code, price, buyingPrice, stock, deptId }); 
+  const { name, code, price, buyingPrice, stock, deptId, section_ids } = data;
+  return dbInsert('menu_items', { name, code, price, buyingPrice, stock, deptId, section_ids: section_ids || [] }); 
 }
 export async function updateMenuItem(id, data) { 
-  const { name, code, price, buyingPrice, stock, deptId } = data;
-  return dbUpdate('menu_items', id, { name, code, price, buyingPrice, stock, deptId }); 
+  const { name, code, price, buyingPrice, stock, deptId, section_ids } = data;
+  return dbUpdate('menu_items', id, { name, code, price, buyingPrice, stock, deptId, section_ids: section_ids || [] }); 
 }
 export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
