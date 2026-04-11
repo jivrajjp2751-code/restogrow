@@ -136,16 +136,25 @@ export default function OrderPage() {
   };
 
   const handlePrintKOT = async () => {
-    if (!order || safeItems.length === 0) return;
+    if (!order || !safeItems || safeItems.length === 0) {
+      addToast('No items to print', 'warning');
+      return;
+    }
+    setBusy(true);
     try {
       if (localStorage.getItem('isPrintStation') === 'true') {
-        printSplitKOT(order, table?.label || table?.number, null, config);
-        addToast('Printing KOT...', 'success');
+        const result = printSplitKOT(order, table?.label || table?.number, null, config);
+        if (result.success) addToast('KOT printed successfully', 'success');
+        else addToast('No items found for departments', 'warning');
       } else {
         await createPrintJob('KOT', { order, tableLabel: table?.label || table?.number });
         addToast('KOT sent to printer queue', 'success');
       }
-    } catch (e) { addToast('Print failed: ' + e.message, 'error'); }
+    } catch (e) {
+      addToast('Print failed: ' + e.message, 'error');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleCancelOrder = async () => {

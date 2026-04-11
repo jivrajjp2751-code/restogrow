@@ -16,6 +16,8 @@ export default function StaffMobileDashboard() {
 
   const [selectedTableId, setSelectedTableId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const selectedTable = useMemo(() => tables.find(t => t.id === selectedTableId) || null, [tables, selectedTableId]);
+
   const depts = useMemo(() => {
     const allDepts = config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}];
     return allDepts.filter(d => {
@@ -23,6 +25,7 @@ export default function StaffMobileDashboard() {
        return selectedTable?.sectionId && d.section_ids.includes(selectedTable.sectionId);
     });
   }, [config, selectedTable]);
+
   const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id);
   useEffect(() => { if (!activeDeptId && depts.length > 0) setActiveDeptId(depts[0].id); }, [depts]);
   const [noteModal, setNoteModal] = useState(null);
@@ -35,7 +38,7 @@ export default function StaffMobileDashboard() {
   const [order, setOrder] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const selectedTable = useMemo(() => tables.find(t => t.id === selectedTableId) || null, [tables, selectedTableId]);
+
 
   const loadOrder = useCallback(async () => {
     if (!selectedTableId) { setOrder(null); return; }

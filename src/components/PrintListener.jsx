@@ -30,20 +30,23 @@ export default function PrintListener() {
         if (error) throw error;
         
         if (data && data.length > 0) {
+          console.log(`📠 Found ${data.length} new print jobs`);
           for (const job of data) {
-            console.log('Incoming print job:', job.type);
+            console.log('📄 Executing:', job.type, job.id);
             
             // Mark immediately so we don't double print
             await markPrintJobDone(job.id);
 
             try {
               if (job.type === 'KOT') {
-                printSplitKOT(job.content.order, job.content.tableLabel, categories || [], config);
+                const results = printSplitKOT(job.content.order, job.content.tableLabel, null, config);
+                console.log(`🍴 KOT Split Result: ${results.success ? 'Success' : 'No items matched departments'}`);
               } else if (job.type === 'BILL') {
                 printBillDirect({ ...job.content.bill, currency: config.currency });
+                console.log('💵 Bill printed');
               }
             } catch (err) {
-              console.error('Print job execution failed:', err);
+              console.error('❌ Print job execution failed:', err);
             }
           }
         }

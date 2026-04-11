@@ -59,13 +59,13 @@ function silentPrint(html) {
   iframe.style.opacity = '0';
   document.body.appendChild(iframe);
 
-  const doc = iframe.contentWindow || iframe.contentDocument;
-  const printDoc = doc.document || doc;
-  printDoc.open();
-  printDoc.write(html);
-  printDoc.close();
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
 
-  iframe.onload = () => {
+  // Give it a tiny moment to render, but don't wait for a full load if possible
+  setTimeout(() => {
     try {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
@@ -73,9 +73,9 @@ function silentPrint(html) {
       console.error('Print failed:', e);
     }
     setTimeout(() => {
-      document.body.removeChild(iframe);
+       if (document.body.contains(iframe)) document.body.removeChild(iframe);
     }, 2000);
-  };
+  }, 100);
 }
 
 // ===== KOT STYLES (shared) =====
