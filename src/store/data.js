@@ -352,31 +352,56 @@ export async function generateBill(orderId, paymentMode, discount) {
 
 export async function getOrderForTable(tableId) {
   if (!_restaurantId) return null;
-  // Try both table_id and tableId to be safe
-  const { data: orders, error } = await supabase.from('orders')
-    .select('*')
-    .eq('restaurant_id', _restaurantId)
-    .or(`tableId.eq.${tableId},table_id.eq.${tableId}`)
-    .eq('status', 'active')
-    .limit(1);
+  try {
+    // Try snake_case first (standard)
+    let { data: orders, error } = await supabase.from('orders')
+      .select('*')
+      .eq('restaurant_id', _restaurantId)
+      .eq('table_id', tableId)
+      .eq('status', 'active')
+      .limit(1);
+      
+    // If not found, try camelCase (legacy/custom)
+    if (!orders || orders.length === 0) {
+      const res = await supabase.from('orders')
+        .select('*')
+        .eq('restaurant_id', _restaurantId)
+        .eq('tableId', tableId)
+        .eq('status', 'active')
+        .limit(1);
+      orders = res.data;
+    }
+      
+    if (!orders || orders.length === 0) return null;
+    const order = orders[0];
     
-  if (error) console.error("🚨 GET ORDER ERROR:", error);
-  if (error || !orders || orders.length === 0) return null;
-  const order = orders[0];
-  
-  // Normalize IDs
-  order.id = order.id || order.order_id;
-  
-  const { data: items } = await supabase.from('order_items')
-    .select('*')
-    .or(`orderId.eq.${order.id},order_id.eq.${order.id}`);
+    // Normalize properties
+    order.id = order.id || order.order_id;
+    order.tableId = order.tableId || order.table_id;
     
-  order.items = (items || []).map(i => ({
-    ...i,
-    quantity: i.quantity || i.qty || 0,
-    price: i.price || 0
-  }));
-  return order;
+    // Fetch items with dual-naming support
+    let { data: items } = await supabase.from('order_items')
+      .select('*')
+      .eq('order_id', order.id);
+
+    if (!items || items.length === 0) {
+      const res = await supabase.from('order_items')
+        .select('*')
+        .eq('orderId', order.id);
+      items = res.data;
+    }
+      
+    order.items = (items || []).map(i => ({
+      ...i,
+      quantity: i.quantity || i.qty || 0,
+      price: i.price || 0,
+      name: i.name || 'Unknown Item'
+    }));
+    return order;
+  } catch (err) {
+    console.error("🚨 GET ORDER CRITICAL FAIL:", err);
+    return null;
+  }
 }
 
 export async function updateOrderItem(orderId, itemId, data) {
