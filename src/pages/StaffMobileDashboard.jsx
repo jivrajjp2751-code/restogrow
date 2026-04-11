@@ -93,19 +93,23 @@ export default function StaffMobileDashboard() {
     finally { setBusy(false); }
   };
 
-  const handleGenerateBill = async () => {
-    if (!order || busy) return;
+  const handlePrintKOT = async () => {
+    if (!order || !order.items || order.items.length === 0 || busy) return;
     setBusy(true);
     try {
-      const result = await generateBill(order.id, paymentMode, discount);
-      if (result?.bill) {
-        try { await createPrintJob('BILL', { bill: result.bill }); } catch {}
-        await refresh();
-        setBillModal(false);
-        setSelectedTableId(null);
+      if (localStorage.getItem('isPrintStation') === 'true') {
+        const { printSplitKOT } = await import('../utils/print');
+        printSplitKOT(order, selectedTable?.label || selectedTable?.number, null, config);
+        addToast('Printing KOT...', 'success');
+      } else {
+        await createPrintJob('KOT', { order, tableLabel: selectedTable?.label || selectedTable?.number });
+        addToast('KOT sent to printer queue', 'success');
       }
-    } catch { addToast('Failed', 'error'); }
-    finally { setBusy(false); }
+    } catch (e) {
+      addToast('Print failed: ' + e.message, 'error');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const subtotal = order?.items?.reduce((s, i) => s + ((i.price || 0) * (i.quantity || 0)), 0) || 0;
@@ -161,7 +165,6 @@ export default function StaffMobileDashboard() {
       <div className="staff-order-header">
         <button className="staff-back-btn" onClick={() => setSelectedTableId(null)}><ArrowLeft size={18} /></button>
         <div style={{ flex: 1, fontWeight: 700 }}>{selectedTable?.label}</div>
-        <button className="staff-bill-btn" onClick={() => setBillModal(true)}><Receipt size={14} /> BILL</button>
       </div>
 
       <div className="staff-menu-search">
@@ -187,26 +190,11 @@ export default function StaffMobileDashboard() {
       </div>
 
       {order?.items?.length > 0 && (
-        <div className="staff-order-summary" style={{ position: 'sticky', bottom: 0, background: '#fff', padding: '10px', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }}>
-          <div style={{ fontSize: '14px', fontWeight: 700 }}>Total: {config.currency}{subtotal}</div>
-        </div>
-      )}
-
-      {billModal && (
-        <div className="modal-backdrop" onClick={() => setBillModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h3>Bill</h3></div>
-            <div className="modal-body">
-               <div className="payment-modes">
-                 {['Cash', 'Card', 'UPI'].map(m => (
-                   <button key={m} className={`payment-mode-btn ${paymentMode === m ? 'active' : ''}`} onClick={() => setPaymentMode(m)}>{m}</button>
-                 ))}
-               </div>
-            </div>
-            <div className="modal-footer">
-               <button className="btn btn-success" onClick={handleGenerateBill}>Print Bill</button>
-            </div>
-          </div>
+        <div className="staff-order-summary" style={{ position: 'sticky', bottom: 0, background: '#fff', padding: '12px', boxShadow: '0 -4px 15px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '15px', fontWeight: 800 }}>{order.items.length} Items</div>
+          <button className="btn btn-primary" onClick={handlePrintKOT} disabled={busy} style={{ minWidth: '120px', padding: '12px' }}>
+             <Printer size={16} style={{ marginRight: '6px' }}/> {busy ? 'Sending...' : 'Print KOT'}
+          </button>
         </div>
       )}
     </div>

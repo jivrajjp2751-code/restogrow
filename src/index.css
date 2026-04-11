@@ -1788,14 +1788,20 @@ ul, ol { list-style: none; }
   
   /* Order Page & Billing Page Overrides */
   .order-layout, .billing-split-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
-    height: calc(100vh - 56px);
+    display: flex !important;
+    flex-direction: column;
+    height: 100% !important;
+  }
+  .menu-panel, .billing-forms {
+    flex: 1;
+    min-height: 0;
   }
   .order-panel, .billing-live-preview {
     border-left: none;
     border-top: 1px solid var(--border-color);
-    max-height: 50vh;
+    height: auto !important;
+    flex-shrink: 0;
+    max-height: 45vh;
   }
   .menu-items-grid {
     grid-template-columns: repeat(2, 1fr) !important;
