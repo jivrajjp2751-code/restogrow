@@ -11,20 +11,19 @@ export function printBillDirect(bill) {
 }
 
 /**
- * Print split KOTs — Kitchen items on one KOT, Bar items on another
- * This is the main KOT function used from mobile/staff
- * Returns { kitchenKOT: bool, barKOT: bool }
+ * Print split KOTs — one per department (Kitchen, Bar, etc.)
+ * Items matched by categoryType/deptId to department ID
  */
-export function printSplitKOT(order, tableNumber, categories = [], config = {}) {
+export function printSplitKOT(order, tableNumber, _unused, config = {}) {
   const departments = config.departments || [{id: 'kitchen', name: 'Kitchen'}, {id: 'bar', name: 'Bar'}];
   
   let printedCount = 0;
   
   departments.forEach((dept) => {
-    // Find all category IDs for this department
-    const deptCatIds = categories.filter(c => c.type === dept.id).map(c => c.id);
-    // Find all items in this order that belong to those categories
-    const deptItems = (order?.items || []).filter(i => deptCatIds.includes(i.categoryId));
+    // Match items by dept: categoryType or deptId matches dept.id
+    const deptItems = (order?.items || []).filter(i =>
+      i.categoryType === dept.id || i.deptId === dept.id
+    );
     
     if (deptItems.length > 0) {
       const deptOrder = { ...order, items: deptItems };
@@ -209,7 +208,9 @@ function buildBillHTML(bill) {
     margin: 0 auto; 
     padding: 4mm; 
     font-size: 11px; 
-    color: #000; 
+    color: #000;
+    font-weight: 700;
+    -webkit-print-color-adjust: exact;
   }
   .center { text-align: center; }
   .bold { font-weight: bold; }

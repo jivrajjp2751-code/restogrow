@@ -126,7 +126,6 @@ export function AppProvider({ children }) {
       tables: data.tables,
       sections: data.sections,
       menuItems: data.menu_items || [],
-      categories: data.categories,
       orders: data.orders,
       bills: data.bills,
       users: data.users,

@@ -5,7 +5,7 @@ import { startSession, endSession, getSessionBills, getSplitReport } from '../st
 import { Play, Square, Clock, DollarSign, Printer, TrendingUp, BarChart3, Coffee, Wine, Calendar, ChevronDown, ChevronUp, Eye, PieChart } from 'lucide-react';
 
 export default function SessionPage() {
-  const { currentUser, currentSession, refresh, config = {}, sessions: allSessions = [], categories = [], bills = [] } = useApp();
+  const { currentUser, currentSession, refresh, config = {}, sessions: allSessions = [], bills = [] } = useApp();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -27,7 +27,7 @@ export default function SessionPage() {
   const handleEndSession = async () => {
     if (!currentSession) return;
     const sessionBills = getSessionBills(currentSession, bills);
-    const splitReport = getSplitReport(sessionBills, categories, config);
+    const splitReport = getSplitReport(sessionBills, null, config);
 
     const report = buildReportData(currentSession, sessionBills, splitReport);
 
@@ -42,7 +42,7 @@ export default function SessionPage() {
 
   const handleViewSession = (session) => {
     const sessionBills = getSessionBills(session, bills);
-    const splitReport = getSplitReport(sessionBills, categories, config);
+    const splitReport = getSplitReport(sessionBills, null, config);
     const report = buildReportData(session, sessionBills, splitReport);
     setViewingSession(report);
   };

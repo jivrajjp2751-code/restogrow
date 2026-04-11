@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { createOrder, addTable, deleteTable, addSection, updateSection, deleteSection } from '../store/data';
+import { createOrder, addTable, deleteTable, addSection, updateSection, deleteSection, cancelOrder } from '../store/data';
 import { Plus, Edit3, Trash2, Settings, X } from 'lucide-react';
 
 export default function TablesPage() {
-  const { tables = [], sections = [], refresh, currentSession } = useApp();
+  const { tables = [], sections = [], config = {}, refresh, currentSession } = useApp();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [filter, setFilter] = useState('all');
@@ -16,8 +16,9 @@ export default function TablesPage() {
   const [addTableModal, setAddTableModal] = useState(null);
   const [newTableForm, setNewTableForm] = useState({ label: '', seats: 4 });
   const [sectionModal, setSectionModal] = useState(null);
-  const [sectionForm, setSectionForm] = useState({ name: '', icon: '🏠', color: '#00B894', surcharge: 0 });
+  const [sectionForm, setSectionForm] = useState({ name: '', icon: '🏠', color: '#00B894', surcharge: 0, surchargeDepts: [] });
 
+  const depts = config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}];
   const getTablesForSection = (sectionId) => tables.filter(t => t.sectionId === sectionId);
 
   const filteredTables = (sectionId) => {
@@ -91,12 +92,18 @@ export default function TablesPage() {
       refresh();
       addToast(`Section "${sectionForm.name}" added`, 'success');
       setSectionModal(null);
-      setSectionForm({ name: '', icon: '🏠', color: '#00B894', surcharge: 0 });
+      setSectionForm({ name: '', icon: '🏠', color: '#00B894', surcharge: 0, surchargeDepts: [] });
     } catch (e) { addToast(e.message || 'Failed', 'error'); }
   };
 
   const handleEditSection = (section) => {
-    setSectionForm({ name: section.name, icon: section.icon, color: section.color, surcharge: section.surcharge || 0 });
+    setSectionForm({
+      name: section.name,
+      icon: section.icon,
+      color: section.color,
+      surcharge: section.surcharge || 0,
+      surchargeDepts: section.surchargeDepts || [],
+    });
     setSectionModal(section);
   };
 
@@ -125,6 +132,17 @@ export default function TablesPage() {
       refresh();
       addToast('Section removed', 'info');
     }
+  };
+
+  const toggleSurchargeDept = (deptId) => {
+    setSectionForm(f => {
+      const current = f.surchargeDepts || [];
+      if (current.includes(deptId)) {
+        return { ...f, surchargeDepts: current.filter(d => d !== deptId) };
+      } else {
+        return { ...f, surchargeDepts: [...current, deptId] };
+      }
+    });
   };
 
   return (
@@ -174,6 +192,9 @@ export default function TablesPage() {
                 <span style={{ fontSize: '16px' }}>{section.icon}</span>
                 <span className="table-section-title">{section.name}</span>
                 <span className="badge badge-info">{getTablesForSection(section.id).length} tables</span>
+                {section.surcharge > 0 && (
+                  <span className="badge badge-warning" style={{ fontSize: '9px' }}>+{section.surcharge}%</span>
+                )}
               </div>
               {editMode && (
                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -214,16 +235,6 @@ export default function TablesPage() {
                   <div className="table-status-badge">
                     {table.status === 'available' ? 'FREE' : table.status === 'occupied' ? 'BUSY' : (table.status || 'UNKNOWN').toUpperCase()}
                   </div>
-                  {table.customerName && (
-                    <div style={{ fontSize: '9px', color: 'var(--text-tertiary)' }}>
-                      {table.customerName}
-                    </div>
-                  )}
-                  {table.seats > 0 && (
-                    <div style={{ fontSize: '8px', color: 'var(--text-tertiary)' }}>
-                      {table.seats} seats
-                    </div>
-                  )}
                 </div>
               ))}
               {sectionTables.length === 0 && (
@@ -242,7 +253,7 @@ export default function TablesPage() {
           className="btn btn-success"
           style={{ marginTop: '12px', width: '100%' }}
           onClick={() => {
-            setSectionForm({ name: '', icon: '🏠', color: '#00B894' });
+            setSectionForm({ name: '', icon: '🏠', color: '#00B894', surcharge: 0, surchargeDepts: [] });
             setSectionModal('new');
           }}
         >
@@ -280,33 +291,22 @@ export default function TablesPage() {
             <div className="modal-body">
               <div className="input-group">
                 <label className="input-label">Customer Name</label>
-                <input
-                  className="input"
-                  placeholder="Optional"
-                  value={customerName}
-                  onChange={e => setCustomerName(e.target.value)}
-                  autoFocus
+                <input className="input" placeholder="Optional" value={customerName}
+                  onChange={e => setCustomerName(e.target.value)} autoFocus
                   onKeyDown={e => { if (e.key === 'Enter') handleStartOrder(); }}
                 />
               </div>
               <div className="input-group">
                 <label className="input-label">Phone</label>
-                <input
-                  className="input"
-                  placeholder="Optional"
-                  value={customerPhone}
+                <input className="input" placeholder="Optional" value={customerPhone}
                   onChange={e => setCustomerPhone(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleStartOrder(); }}
                 />
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setCustomerModal(null)}>
-                Cancel
-              </button>
-              <button className="btn btn-success btn-lg" onClick={handleStartOrder}>
-                START ORDER
-              </button>
+              <button className="btn btn-secondary" onClick={() => setCustomerModal(null)}>Cancel</button>
+              <button className="btn btn-success btn-lg" onClick={handleStartOrder}>START ORDER</button>
             </div>
           </div>
         </div>
@@ -344,7 +344,7 @@ export default function TablesPage() {
         </div>
       )}
 
-      {/* Section Modal */}
+      {/* Section Modal — FIXED LAYOUT */}
       {sectionModal && (
         <div className="modal-backdrop" onClick={() => setSectionModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -374,14 +374,49 @@ export default function TablesPage() {
                     onChange={e => setSectionForm(f => ({ ...f, color: e.target.value }))}
                     style={{ width: '100px' }} />
                 </div>
-                <div className="input-group">
+              </div>
+              <div className="input-group">
                 <label className="input-label">Hidden Surcharge (%)</label>
                 <input type="number" className="input" value={sectionForm.surcharge}
                   onChange={e => setSectionForm(f => ({ ...f, surcharge: Number(e.target.value) || 0 }))}
                   placeholder="e.g. 15" />
                 <p style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Automatically adds % to item price in this section.</p>
               </div>
-            </div>
+
+              {/* Department surcharge applicability */}
+              {Number(sectionForm.surcharge) > 0 && (
+                <div className="input-group">
+                  <label className="input-label">Apply Surcharge To</label>
+                  <p style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>
+                    Select which departments get the surcharge. Items from unselected departments will sell at MRP.
+                    {(sectionForm.surchargeDepts || []).length === 0 && ' (None selected = applies to ALL)'}
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {depts.map(dept => {
+                      const isSelected = (sectionForm.surchargeDepts || []).includes(dept.id);
+                      return (
+                        <button
+                          key={dept.id}
+                          type="button"
+                          onClick={() => toggleSurchargeDept(dept.id)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            border: `2px solid ${isSelected ? 'var(--brand-primary)' : 'var(--border-color)'}`,
+                            background: isSelected ? 'rgba(94, 92, 230, 0.1)' : 'var(--bg-tertiary)',
+                            color: isSelected ? 'var(--brand-primary)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {isSelected ? '✓ ' : ''}{dept.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setSectionModal(null)}>Cancel</button>

@@ -3,17 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
 import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
-  createOrder, generateBill, cancelOrder, createPrintJob
+  createOrder, cancelOrder, createPrintJob
 } from '../store/data';
-import { printSplitKOT, printBillDirect } from '../utils/print';
-import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, CreditCard, Banknote, Smartphone, Receipt, Edit3 } from 'lucide-react';
+import { Search, ArrowLeft, Printer, StickyNote, Edit3, XCircle } from 'lucide-react';
 
 export default function OrderPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
   const { tables = [], sections = [], menuItems = [], config = {}, refresh, currentUser } = useApp();
   const { addToast } = useToast();
-  const isAdmin = currentUser?.role === 'admin';
 
   const table = useMemo(() => (tables || []).find(t => t.id === tableId), [tables, tableId]);
   const [order, setOrder] = useState(null);
@@ -22,25 +20,19 @@ export default function OrderPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [noteModal, setNoteModal] = useState(null);
   const [noteText, setNoteText] = useState('');
-  const [showKOTMenu, setShowKOTMenu] = useState(false);
-  const [directBillModal, setDirectBillModal] = useState(false);
-  const [paymentMode, setPaymentMode] = useState('Cash');
-  const [discount, setDiscount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [orderLoading, setOrderLoading] = useState(true);
-
-  // Price editing state
   const [priceEditModal, setPriceEditModal] = useState(null);
   const [editPrice, setEditPrice] = useState('');
 
-  // Get section surcharge for the current table
-  const tableSurcharge = useMemo(() => {
-    if (!table?.sectionId || !sections?.length) return 0;
-    const section = sections.find(s => s.id === table.sectionId);
-    return section?.surcharge || 0;
+  // Get section info for the current table
+  const sectionInfo = useMemo(() => {
+    if (!table?.sectionId || !sections?.length) return null;
+    return sections.find(s => s.id === table.sectionId) || null;
   }, [table, sections]);
 
-  const surchargeFactor = 1 + (tableSurcharge / 100);
+  const tableSurcharge = sectionInfo?.surcharge || 0;
+  const surchargeDepts = sectionInfo?.surchargeDepts || [];
 
   const loadOrder = useCallback(async () => {
     if (!tableId) return;
@@ -72,6 +64,13 @@ export default function OrderPage() {
     });
   }, [menuItems, activeDeptId, q]);
 
+  // Check if surcharge is applicable for a given dept
+  const isSurchargeApplicable = useCallback((deptId) => {
+    if (tableSurcharge <= 0) return false;
+    if (surchargeDepts.length === 0) return true; // empty = all
+    return surchargeDepts.includes(deptId);
+  }, [tableSurcharge, surchargeDepts]);
+
   const handleAddItem = async (menuItem) => {
     if (!order || busy) return;
     setBusy(true);
@@ -97,14 +96,6 @@ export default function OrderPage() {
     finally { setBusy(false); }
   };
 
-  const handleRemoveItem = async (itemId) => {
-    if (!order || busy) return;
-    setBusy(true);
-    try { await removeOrderItem(order.id, itemId); await loadOrder(); }
-    catch { addToast('Failed', 'error'); }
-    finally { setBusy(false); }
-  };
-
   const handleAddNote = async () => {
     if (!order || !noteModal || busy) return;
     setBusy(true);
@@ -115,7 +106,6 @@ export default function OrderPage() {
     setNoteText('');
   };
 
-  // Price edit handlers
   const openPriceEdit = (item) => {
     setPriceEditModal(item);
     setEditPrice(String(item.price || ''));
@@ -129,33 +119,30 @@ export default function OrderPage() {
     try {
       await updateOrderItem(order.id, priceEditModal.id, { price: newPrice });
       await loadOrder();
-      addToast(`Price updated to ${config.currency}${newPrice}`, 'success');
+      addToast(`Price → ${config.currency}${newPrice}`, 'success');
     } catch { addToast('Failed', 'error'); }
     finally { setBusy(false); }
     setPriceEditModal(null);
-    setEditPrice('');
   };
 
-  const handlePrintSplitKOT = async () => {
+  const handlePrintKOT = async () => {
     if (!order || safeItems.length === 0) return;
     try {
       await createPrintJob('KOT', { order, tableLabel: table?.label || table?.number });
       addToast('Printing KOT...', 'info');
-    } catch { addToast('Print request failed', 'error'); }
-    setShowKOTMenu(false);
+    } catch { addToast('Print failed', 'error'); }
   };
 
-  const handleDirectBill = async () => {
-    if (!order || busy) return;
+  const handleCancelOrder = async () => {
+    if (!order) return;
+    if (!confirm('Cancel this order? All items will be removed.')) return;
     setBusy(true);
     try {
-      const result = await generateBill(order.id, paymentMode, discount);
-      if (result?.bill) {
-        try { await createPrintJob('BILL', { bill: result.bill }); } catch {}
-        await refresh();
-        navigate('/tables');
-      }
-    } catch { addToast('Failed', 'error'); }
+      await cancelOrder(order.id, tableId);
+      await refresh();
+      addToast('Order cancelled', 'info');
+      navigate('/tables');
+    } catch (e) { addToast('Cancel failed: ' + e.message, 'error'); }
     finally { setBusy(false); }
   };
 
@@ -171,7 +158,7 @@ export default function OrderPage() {
           <button className="btn btn-ghost btn-icon" onClick={() => navigate('/tables')}><ArrowLeft size={16} /></button>
           <div style={{ fontWeight: 800, fontSize: '13px' }}>{table?.label || 'Table'}</div>
           {tableSurcharge > 0 && (
-            <span className="badge badge-warning" style={{ fontSize: '9px' }}>+{tableSurcharge}% surcharge</span>
+            <span className="badge badge-warning" style={{ fontSize: '9px' }}>+{tableSurcharge}%</span>
           )}
         </div>
 
@@ -182,24 +169,25 @@ export default function OrderPage() {
 
         <div className="category-tabs compact">
           {depts.map(dept => (
-             <button key={dept.id} className={`category-tab ${activeDeptId === dept.id ? 'active' : ''}`} onClick={() => setActiveDeptId(dept.id)}>
-                {dept.name}
-             </button>
+            <button key={dept.id} className={`category-tab ${activeDeptId === dept.id ? 'active' : ''}`} onClick={() => setActiveDeptId(dept.id)}>
+              {dept.name}
+              {isSurchargeApplicable(dept.id) && <span style={{ fontSize: '8px', marginLeft: '3px', color: 'var(--brand-warning)' }}>+{tableSurcharge}%</span>}
+            </button>
           ))}
         </div>
 
         <div className="menu-items-grid compact" style={{ padding: '10px', overflowY: 'auto', height: 'calc(100% - 140px)' }}>
           {deptItems.map(item => {
-            // Show the surcharge-adjusted price in the menu
-            const displayPrice = tableSurcharge > 0
-              ? Math.round(item.price * surchargeFactor)
+            const deptApplicable = isSurchargeApplicable(item.deptId || activeDeptId);
+            const displayPrice = deptApplicable
+              ? Math.round(item.price * (1 + tableSurcharge / 100))
               : item.price;
             return (
               <div key={item.id} className="menu-item-card" onClick={() => handleAddItem(item)}>
                 <div className="menu-item-name">{item.name}</div>
                 <div className="menu-item-price">
                   {config.currency}{displayPrice}
-                  {tableSurcharge > 0 && (
+                  {deptApplicable && tableSurcharge > 0 && (
                     <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontWeight: 400, marginLeft: '4px', textDecoration: 'line-through' }}>
                       {item.price}
                     </span>
@@ -212,7 +200,17 @@ export default function OrderPage() {
       </div>
 
       <div className="order-panel">
-        <div className="order-panel-header"><span>ORDER</span> <span className="badge badge-info">{safeItems.length}</span></div>
+        <div className="order-panel-header">
+          <span>ORDER</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span className="badge badge-info">{safeItems.length}</span>
+            {safeItems.length > 0 && (
+              <button className="btn btn-sm btn-ghost" style={{ color: 'var(--brand-danger)', fontSize: '10px' }} onClick={handleCancelOrder}>
+                <XCircle size={12} /> CANCEL
+              </button>
+            )}
+          </div>
+        </div>
         <div className="order-items-list">
           {safeItems.map(item => (
             <div key={item.id} className="order-item">
@@ -243,7 +241,7 @@ export default function OrderPage() {
             <span>TOTAL</span><span>{config.currency}{Math.round(total)}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <button className="btn btn-secondary" onClick={handlePrintSplitKOT}><Printer size={14}/> KOT</button>
+            <button className="btn btn-secondary" onClick={handlePrintKOT}><Printer size={14}/> KOT</button>
             <button className="btn btn-success" onClick={() => navigate(`/billing/${order.id}`)}>BILL</button>
           </div>
         </div>
@@ -255,7 +253,8 @@ export default function OrderPage() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{maxWidth:'300px'}}>
             <div className="modal-header"><h3 className="modal-title">Note</h3></div>
             <div className="modal-body">
-              <input className="input" value={noteText} onChange={e => setNoteText(e.target.value)} autoFocus />
+              <input className="input" value={noteText} onChange={e => setNoteText(e.target.value)} autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') handleAddNote(); }} />
             </div>
             <div className="modal-footer">
               <button className="btn btn-primary" onClick={handleAddNote}>Save</button>
@@ -275,26 +274,13 @@ export default function OrderPage() {
             <div className="modal-body">
               <div className="input-group">
                 <label className="input-label">Price per unit ({config.currency})</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={editPrice}
-                  onChange={e => setEditPrice(e.target.value)}
-                  autoFocus
-                  onKeyDown={e => { if (e.key === 'Enter') handleSavePrice(); }}
-                  style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-mono)', textAlign: 'center' }}
-                />
+                <input type="number" className="input" value={editPrice} onChange={e => setEditPrice(e.target.value)}
+                  autoFocus onKeyDown={e => { if (e.key === 'Enter') handleSavePrice(); }}
+                  style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-mono)', textAlign: 'center' }} />
               </div>
               <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                Original: {config.currency}{priceEditModal.price} × {priceEditModal.quantity} =
-                {config.currency}{priceEditModal.price * priceEditModal.quantity}
+                Original: {config.currency}{priceEditModal.price} × {priceEditModal.quantity} = {config.currency}{priceEditModal.price * priceEditModal.quantity}
               </p>
-              {editPrice && Number(editPrice) !== priceEditModal.price && (
-                <p style={{ fontSize: '10px', color: 'var(--brand-primary)', marginTop: '2px', fontWeight: 700 }}>
-                  New: {config.currency}{Number(editPrice)} × {priceEditModal.quantity} =
-                  {config.currency}{Number(editPrice) * priceEditModal.quantity}
-                </p>
-              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setPriceEditModal(null)}>Cancel</button>

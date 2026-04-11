@@ -4,7 +4,7 @@ import { getSplitReport, getMonthBills, getMostSoldLiquor, getSessionBills } fro
 import { TrendingUp, Calendar, DollarSign, PieChart, Printer, Wine, Coffee, Award } from 'lucide-react';
 
 export default function ReportsPage() {
-  const { config = {}, categories = [], bills = [], sessions = [] } = useApp();
+  const { config = {}, bills = [], sessions = [] } = useApp();
   const [reportType, setReportType] = useState('daily'); // daily, monthly, session
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selectedSessionId, setSelectedSessionId] = useState('');
@@ -38,7 +38,7 @@ export default function ReportsPage() {
   const totalItems = filteredBills.reduce((s, b) => s + (b.items || []).reduce((ss, i) => ss + (i.quantity || 0), 0), 0);
   
   // Split Report: bar vs kitchen
-  const splitReport = getSplitReport(filteredBills, categories, config);
+  const splitReport = getSplitReport(filteredBills, null, config);
 
   // Payment Breakdown
   const paymentSales = { Cash: 0, Card: 0, UPI: 0 };
@@ -51,25 +51,24 @@ export default function ReportsPage() {
   });
 
   // Monthly most sold liquor
-  const mostSoldLiquor = reportType === 'monthly' ? getMostSoldLiquor(selectedMonth, bills, categories) : [];
+  const mostSoldLiquor = reportType === 'monthly' ? getMostSoldLiquor(selectedMonth, bills) : [];
 
-  // Category Breakdown - fallback to 'Uncategorized' if no match
-  const categorySales = {};
+  // Department Breakdown
+  const deptSales = {};
   filteredBills.forEach(bill => {
     (bill.items || []).forEach(item => {
-      let deptName = 'Uncategorized';
-      let deptColor = '#ccc';
+      let deptName = 'Other';
       splitReport.departments?.forEach(d => {
-         if (item.categoryType === d.id || (d.items && d.items.find(i => i.name === item.name))) {
+         if (item.categoryType === d.id || item.deptId === d.id || (d.items && d.items.find(i => i.name === item.name))) {
             deptName = d.name;
          }
       });
-      if (!categorySales[deptName]) categorySales[deptName] = { qty: 0, revenue: 0, color: deptColor };
-      categorySales[deptName].qty += (item.quantity || 0);
-      categorySales[deptName].revenue += (item.price || 0) * (item.quantity || 0);
+      if (!deptSales[deptName]) deptSales[deptName] = { qty: 0, revenue: 0 };
+      deptSales[deptName].qty += (item.quantity || 0);
+      deptSales[deptName].revenue += (item.price || 0) * (item.quantity || 0);
     });
   });
-  const categoryData = Object.entries(categorySales).sort((a,b) => b[1].revenue - a[1].revenue);
+  const deptData = Object.entries(deptSales).sort((a,b) => b[1].revenue - a[1].revenue);
 
   const handlePrintReport = () => {
     const html = buildPrintableReport();
@@ -132,10 +131,10 @@ ${reportType === 'monthly' && mostSoldLiquor.length > 0 ? `
 ${mostSoldLiquor.slice(0, 20).map((i, idx) => `<tr><td>${idx + 1}</td><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${config.currency}${i.revenue}</td></tr>`).join('')}
 </table>` : ''}
 
-<h3>Category Sales</h3>
+<h3>Department Sales</h3>
 <table>
-<tr><th>Category</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th></tr>
-${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:center">${data.qty}</td><td style="text-align:right">${config.currency}${data.revenue}</td></tr>`).join('')}
+<tr><th>Department</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th></tr>
+${deptData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:center">${data.qty}</td><td style="text-align:right">${config.currency}${data.revenue}</td></tr>`).join('')}
 </table>
 
 <div class="d"></div>
@@ -257,20 +256,16 @@ ${categoryData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:
             </div>
           </div>
 
-          {/* Category Sales */}
+          {/* Department Sales */}
           <div className="card" style={{ flex: 1 }}>
-            <div className="card-header"><span className="card-title">SALES BY CATEGORY</span></div>
+            <div className="card-header"><span className="card-title">SALES BY DEPARTMENT</span></div>
             <div className="card-body" style={{ padding: 0 }}>
               <table className="data-table">
-                <thead><tr><th>CATEGORY</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
+                <thead><tr><th>DEPARTMENT</th><th style={{ textAlign: 'center' }}>QTY</th><th style={{ textAlign: 'right' }}>REVENUE</th></tr></thead>
                 <tbody>
-                  {categoryData.length > 0 ? categoryData.map(([name, data]) => (
+                  {deptData.length > 0 ? deptData.map(([name, data]) => (
                     <tr key={name}>
-                      <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: data.color, display: 'inline-block' }}></span>
-                        {name}
-                        <span className={`badge ${data.type === 'kitchen' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: '8px' }}>{data.type === 'kitchen' ? 'K' : 'B'}</span>
-                      </td>
+                      <td style={{ fontWeight: 600 }}>{name}</td>
                       <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{data.qty}</td>
                       <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{config.currency}{data.revenue}</td>
                     </tr>
