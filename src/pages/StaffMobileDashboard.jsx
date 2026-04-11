@@ -105,6 +105,10 @@ export default function StaffMobileDashboard() {
     finally { setBusy(false); }
   };
 
+  const subtotal = useMemo(() => {
+    return (order?.items || []).reduce((s, i) => s + (i.price * i.quantity), 0);
+  }, [order]);
+
   const handlePrintKOT = async () => {
     if (!order || !order.items || order.items.length === 0 || busy) return;
     setBusy(true);
@@ -192,7 +196,7 @@ export default function StaffMobileDashboard() {
         ))}
       </div>
 
-      <div className="staff-menu-grid">
+      <div className="staff-menu-grid" style={{ marginBottom: order?.items?.length > 0 ? '160px' : '0' }}>
         {filteredItems.map(item => (
           <div key={item.id} className="staff-menu-card" onClick={() => handleAddItem(item)}>
             <div className="staff-menu-card-name">{item.name}</div>
@@ -202,11 +206,33 @@ export default function StaffMobileDashboard() {
       </div>
 
       {order?.items?.length > 0 && (
-        <div className="staff-order-summary" style={{ position: 'sticky', bottom: 0, background: '#fff', padding: '12px', boxShadow: '0 -4px 15px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '15px', fontWeight: 800 }}>{order.items.length} Items</div>
-          <button className="btn btn-primary" onClick={handlePrintKOT} disabled={busy} style={{ minWidth: '120px', padding: '12px' }}>
-             <Printer size={16} style={{ marginRight: '6px' }}/> {busy ? 'Sending...' : 'Print KOT'}
-          </button>
+        <div className="staff-order-drawer">
+          <div className="staff-drawer-header">
+            <span className="staff-drawer-title">CURRENT ORDER ({order.items.length})</span>
+            <span className="staff-drawer-subtotal">{config.currency}{subtotal}</span>
+          </div>
+          
+          <div className="staff-item-list">
+            {order.items.map(item => (
+              <div key={item.id} className="staff-drawer-item">
+                <div className="staff-item-info">
+                  <div className="staff-item-name">{item.name}</div>
+                  {item.note && <div className="staff-item-note">{item.note}</div>}
+                </div>
+                <div className="staff-qty-controls">
+                  <button className="qty-btn" onClick={() => handleQtyChange(item.id, -1)}>-</button>
+                  <span className="staff-qty-value">{item.quantity}</span>
+                  <button className="qty-btn" onClick={() => handleQtyChange(item.id, 1)}>+</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="staff-drawer-actions">
+            <button className="btn btn-primary btn-lg" onClick={handlePrintKOT} disabled={busy} style={{ width: '100%', height: '48px', gap: '10px' }}>
+               <Printer size={18} /> {busy ? 'Printing...' : 'PRINT KOT'}
+            </button>
+          </div>
         </div>
       )}
     </div>
