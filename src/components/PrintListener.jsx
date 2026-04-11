@@ -14,43 +14,53 @@ export default function PrintListener() {
   useEffect(() => {
     if (!isPrintStation || !currentUser || !supabase) return;
 
-    const channel = supabase
-      .channel('print_jobs_realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'print_jobs',
-          filter: `restaurant_id=eq.${currentUser.restaurant_id}`
-        },
-        async (payload) => {
-          const job = payload.new;
-          if (job.status !== 'pending') return;
+    let isPolling = false;
 
-          try {
+    const pollJobs = async () => {
+      if (isPolling) return;
+      isPolling = true;
+      try {
+        const { data, error } = await supabase
+          .from('print_jobs')
+          .select('*')
+          .eq('status', 'pending')
+          .eq('restaurant_id', currentUser.restaurant_id)
+          .order('created_at', { ascending: true });
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          for (const job of data) {
             console.log('Incoming print job:', job.type);
             
-            if (job.type === 'KOT') {
-              // content: { order, tableLabel }
-              printSplitKOT(job.content.order, job.content.tableLabel, categories || [], config);
-            } else if (job.type === 'BILL') {
-              // content: { bill }
-              printBillDirect({ ...job.content.bill, currency: config.currency });
-            }
-
-            // Mark as done so others don't print it
+            // Mark immediately so we don't double print
             await markPrintJobDone(job.id);
-          } catch (err) {
-            console.error('Print job failed:', err);
+
+            try {
+              if (job.type === 'KOT') {
+                printSplitKOT(job.content.order, job.content.tableLabel, categories || [], config);
+              } else if (job.type === 'BILL') {
+                printBillDirect({ ...job.content.bill, currency: config.currency });
+              }
+            } catch (err) {
+              console.error('Print job execution failed:', err);
+            }
           }
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+      } catch (e) {
+        console.error('Print queue polling error:', e);
+      } finally {
+        isPolling = false;
+      }
     };
+
+    // Initial check
+    pollJobs();
+    
+    // Poll every 4 seconds
+    const intervalId = setInterval(pollJobs, 4000);
+
+    return () => clearInterval(intervalId);
   }, [isPrintStation, currentUser, config, categories]);
 
   return null; // Or a small status indicator
