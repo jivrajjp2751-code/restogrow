@@ -233,18 +233,35 @@ export async function cancelOrder(orderId, tableId) {
 }
 
 export async function addItemToOrder(orderId, item) {
-  // 1. Get order's table and section surcharge
-  const { data: order } = await supabase.from('orders').select('tableId').eq('id', orderId).single();
+  // 1. Get order's table and section surcharge - checking BOTH column names for safety
+  const { data: orderData, error: oErr } = await supabase.from('orders')
+    .select('tableId, table_id')
+    .eq('id', orderId)
+    .single();
+    
+  if (oErr) {
+    console.warn("Could not find order for surcharge check, proceeding without it.", oErr);
+  }
+
+  const tableId = orderData?.tableId || orderData?.table_id;
   let surcharge = 0;
   const itemDept = item.deptId || item.categoryType || 'bar';
   
-  if (order?.tableId) {
-    const { data: table } = await supabase.from('tables').select('sectionId').eq('id', order.tableId).single();
-    if (table?.sectionId) {
-      const { data: section } = await supabase.from('sections').select('surcharge, surchargeDepts').eq('id', table.sectionId).single();
+  if (tableId) {
+    const { data: table } = await supabase.from('tables')
+      .select('sectionId, section_id')
+      .eq('id', tableId)
+      .single();
+      
+    const sectionId = table?.sectionId || table?.section_id;
+    if (sectionId) {
+      const { data: section } = await supabase.from('sections')
+        .select('surcharge, surchargeDepts, surcharge_depts')
+        .eq('id', sectionId)
+        .single();
+        
       if (section) {
-        const surchargeDepts = section.surchargeDepts || [];
-        // Only apply surcharge if surchargeDepts is empty (all) or includes this dept
+        const surchargeDepts = section.surchargeDepts || section.surcharge_depts || [];
         const isApplicable = surchargeDepts.length === 0 || surchargeDepts.includes(itemDept);
         surcharge = isApplicable ? (section.surcharge || 0) : 0;
       }
@@ -254,17 +271,21 @@ export async function addItemToOrder(orderId, item) {
   const surchargeFactor = 1 + (surcharge / 100);
   const finalPrice = Math.round((item.price || 0) * surchargeFactor);
 
+  // Payload with both camel and snake for maximum compatibility with whatever DB schema the client has
   const payload = {
     order_id: orderId,
-    orderId: orderId, // Defensive
+    orderId: orderId,
     menu_item_id: item.id || item.menuItemId,
+    menuItemId: item.id || item.menuItemId,
     name: item.name,
     price: finalPrice,
     quantity: item.quantity || 1,
     category_type: itemDept,
+    categoryType: itemDept,
     note: item.note || '',
     restaurant_id: _restaurantId
   };
+  
   return dbInsert('order_items', payload);
 }
 

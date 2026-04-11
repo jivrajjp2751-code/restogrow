@@ -88,7 +88,10 @@ export default function OrderPage() {
       await addItemToOrder(order.id, { ...menuItem, categoryType: menuItem.deptId || 'bar' });
       await loadOrder();
       addToast(`+ ${menuItem.name}`, 'success');
-    } catch { addToast('Failed', 'error'); }
+    } catch (e) { 
+      console.error("ADD ITEM ERROR:", e);
+      addToast(`Error: ${e.message || 'Check connection'}`, 'error'); 
+    }
     finally { setBusy(false); }
   };
 
