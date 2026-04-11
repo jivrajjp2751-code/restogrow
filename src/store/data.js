@@ -205,10 +205,8 @@ export async function createOrder(tableId, tableLabel, customerName, createdBy) 
   const orderData = { 
     id: orderId,
     tableId: tableId, 
-    table_id: tableId, // Defensive
     tableLabel, 
     status: 'active', 
-    customerName,
     createdBy,
   };
   const order = await dbInsert('orders', orderData);
