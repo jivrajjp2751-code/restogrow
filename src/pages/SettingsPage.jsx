@@ -232,11 +232,13 @@ export default function SettingsPage() {
 
               {previewTaxRate > 0 && (
                 <>
-                  <div style={{ textAlign: 'right', fontSize: '9px' }}>
-                    Add S GST({halfTax.toFixed(3)}%) on 500.00 <span style={{ marginLeft: '4px' }}>{(500 * halfTax / 100).toFixed(2)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                    <span>Add S GST({halfTax.toFixed(3)}%) on 500.00</span>
+                    <span>{(500 * halfTax / 100).toFixed(2)}</span>
                   </div>
-                  <div style={{ textAlign: 'right', fontSize: '9px' }}>
-                    Add C GST({halfTax.toFixed(3)}%) on 500.00 <span style={{ marginLeft: '4px' }}>{(500 * halfTax / 100).toFixed(2)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                    <span>Add C GST({halfTax.toFixed(3)}%) on 500.00</span>
+                    <span>{(500 * halfTax / 100).toFixed(2)}</span>
                   </div>
                 </>
               )}

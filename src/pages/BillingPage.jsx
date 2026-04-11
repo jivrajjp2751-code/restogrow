@@ -17,7 +17,7 @@ export default function BillingPage() {
   const [generatedBill, setGeneratedBill] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  if (!order) {
+  if (!order && !generatedBill) {
     return (
       <div className="page-content"><div className="empty-state">
         <p className="empty-state-title">Order not found</p>
@@ -267,18 +267,21 @@ export default function BillingPage() {
 
             {pTaxRate > 0 && (
               <>
-                <div style={{ textAlign: 'right', fontSize: '9px' }}>
-                  Add S GST({pHalfRate.toFixed(3)}%) on {pSubtotal.toFixed(2)} <span style={{ marginLeft: '4px' }}>{pSgst.toFixed(2)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                  <span>Add S GST({pHalfRate.toFixed(3)}%) on {pSubtotal.toFixed(2)}</span>
+                  <span>{pSgst.toFixed(2)}</span>
                 </div>
-                <div style={{ textAlign: 'right', fontSize: '9px' }}>
-                  Add C GST({pHalfRate.toFixed(3)}%) on {pSubtotal.toFixed(2)} <span style={{ marginLeft: '4px' }}>{pCgst.toFixed(2)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                  <span>Add C GST({pHalfRate.toFixed(3)}%) on {pSubtotal.toFixed(2)}</span>
+                  <span>{pCgst.toFixed(2)}</span>
                 </div>
               </>
             )}
 
             {pDiscountAmount > 0 && (
-              <div style={{ textAlign: 'right', fontSize: '9px' }}>
-                Discount {pDiscountPercent}% <span style={{ marginLeft: '4px' }}>-{pDiscountAmount.toFixed(2)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                <span>Discount {pDiscountPercent}%</span>
+                <span>-{pDiscountAmount.toFixed(2)}</span>
               </div>
             )}
 

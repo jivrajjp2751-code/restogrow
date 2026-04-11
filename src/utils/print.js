@@ -305,8 +305,7 @@ function buildBillHTML(bill) {
   }
   .tax-row {
     display: flex;
-    justify-content: flex-end;
-    gap: 12px;
+    justify-content: space-between;
     padding: 1px 0;
     font-size: 11px;
   }
