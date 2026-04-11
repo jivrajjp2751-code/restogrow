@@ -58,8 +58,13 @@ export default function BillingPage() {
   const handlePrintBill = async () => {
     if (!generatedBill) return;
     try {
-      printBillDirect(generatedBill);
-      addToast('Printing Bill...', 'success');
+      if (localStorage.getItem('isPrintStation') === 'true') {
+        printBillDirect(generatedBill);
+        addToast('Printing Bill...', 'success');
+      } else {
+        await createPrintJob('BILL', { bill: generatedBill });
+        addToast('Bill sent to printer queue', 'success');
+      }
     } catch (e) { addToast('Print failed: ' + e.message, 'error'); }
   };
 

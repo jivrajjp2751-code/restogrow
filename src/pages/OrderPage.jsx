@@ -129,8 +129,13 @@ export default function OrderPage() {
   const handlePrintKOT = async () => {
     if (!order || safeItems.length === 0) return;
     try {
-      printSplitKOT(order, table?.label || table?.number, null, config);
-      addToast('Printing KOT...', 'success');
+      if (localStorage.getItem('isPrintStation') === 'true') {
+        printSplitKOT(order, table?.label || table?.number, null, config);
+        addToast('Printing KOT...', 'success');
+      } else {
+        await createPrintJob('KOT', { order, tableLabel: table?.label || table?.number });
+        addToast('KOT sent to printer queue', 'success');
+      }
     } catch (e) { addToast('Print failed: ' + e.message, 'error'); }
   };
 
