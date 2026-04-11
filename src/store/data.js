@@ -162,7 +162,7 @@ export async function createPrintJob(type, content) {
     type,
     content,
     status: 'pending',
-    createdAt: new Date().toISOString()
+    created_at: new Date().toISOString()
   });
 }
 
