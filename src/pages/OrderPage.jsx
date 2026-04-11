@@ -16,8 +16,15 @@ export default function OrderPage() {
 
   const table = useMemo(() => (tables || []).find(t => t.id === tableId), [tables, tableId]);
   const [order, setOrder] = useState(null);
-  const depts = useMemo(() => config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}], [config]);
-  const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id || 'kitchen');
+  const depts = useMemo(() => {
+    const allDepts = config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}];
+    return allDepts.filter(d => {
+      if (!d.section_ids || d.section_ids.length === 0) return true;
+      return table?.sectionId && d.section_ids.includes(table.sectionId);
+    });
+  }, [config, table]);
+  const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id);
+  useEffect(() => { if (!activeDeptId && depts.length > 0) setActiveDeptId(depts[0].id); }, [depts]);
   const [searchQuery, setSearchQuery] = useState('');
   const [noteModal, setNoteModal] = useState(null);
   const [noteText, setNoteText] = useState('');

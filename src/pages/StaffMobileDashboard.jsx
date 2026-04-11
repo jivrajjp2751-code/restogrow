@@ -16,8 +16,15 @@ export default function StaffMobileDashboard() {
 
   const [selectedTableId, setSelectedTableId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const depts = useMemo(() => config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}], [config]);
-  const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id || 'kitchen');
+  const depts = useMemo(() => {
+    const allDepts = config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}];
+    return allDepts.filter(d => {
+       if (!d.section_ids || d.section_ids.length === 0) return true;
+       return selectedTable?.sectionId && d.section_ids.includes(selectedTable.sectionId);
+    });
+  }, [config, selectedTable]);
+  const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id);
+  useEffect(() => { if (!activeDeptId && depts.length > 0) setActiveDeptId(depts[0].id); }, [depts]);
   const [noteModal, setNoteModal] = useState(null);
   const [noteText, setNoteText] = useState('');
   const [customerModal, setCustomerModal] = useState(null);

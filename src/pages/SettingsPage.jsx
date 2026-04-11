@@ -20,7 +20,7 @@ const DEFAULT_BILL_LAYOUT = {
 };
 
 export default function SettingsPage() {
-  const { config = {}, refresh } = useApp();
+  const { config = {}, refresh, sections = [] } = useApp();
   const { addToast } = useToast();
   const [form, setForm] = useState({ ...config });
   const [billLayout, setBillLayout] = useState({ ...DEFAULT_BILL_LAYOUT, ...(config.billLayout || {}) });
@@ -280,22 +280,40 @@ export default function SettingsPage() {
         </p>
         <div className="config-grid" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}]).map((dept, idx) => (
-            <div key={dept.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
-              <input className="input" value={dept.name} onChange={e => {
-                const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
-                newDepts[idx] = { ...newDepts[idx], name: e.target.value };
-                setForm(f => ({ ...f, departments: newDepts }));
-              }} />
-              <button className="btn btn-ghost" style={{ color: 'var(--brand-danger)' }} onClick={() => {
-                const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
-                newDepts.splice(idx, 1);
-                setForm(f => ({ ...f, departments: newDepts }));
-              }}>X</button>
+            <div key={dept.id} style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border:'1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom:'8px' }}>
+                <input className="input" value={dept.name} onChange={e => {
+                  const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
+                  newDepts[idx] = { ...newDepts[idx], name: e.target.value };
+                  setForm(f => ({ ...f, departments: newDepts }));
+                }} style={{flex:1}} />
+                <button className="btn btn-ghost" style={{ color: 'var(--brand-danger)' }} onClick={() => {
+                  const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
+                  newDepts.splice(idx, 1);
+                  setForm(f => ({ ...f, departments: newDepts }));
+                }}>X</button>
+              </div>
+              <div style={{fontSize:'10px', color:'var(--text-secondary)', marginBottom:'4px'}}>Show in specific sections (Optional):</div>
+              <div style={{display:'flex', flexWrap:'wrap', gap:'8px'}}>
+                {sections.map(s => (
+                  <label key={s.id} style={{fontSize:'11px', display:'flex', alignItems:'center', gap:'4px', cursor:'pointer'}}>
+                    <input type="checkbox" checked={dept.section_ids?.includes(s.id)} onChange={e => {
+                      const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
+                      const currentIds = newDepts[idx].section_ids || [];
+                      const newIds = e.target.checked ? [...currentIds, s.id] : currentIds.filter(id => id !== s.id);
+                      newDepts[idx] = { ...newDepts[idx], section_ids: newIds };
+                      setForm(f => ({ ...f, departments: newDepts }));
+                    }} />
+                    {s.name}
+                  </label>
+                ))}
+                {sections.length === 0 && <span style={{fontSize:'9px'}}>Create sections first</span>}
+              </div>
             </div>
           ))}
           <button className="btn btn-secondary btn-sm" onClick={() => {
             const newDepts = [...(form.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}])];
-            newDepts.push({ id: 'dept_' + Date.now(), name: 'New Dept' });
+            newDepts.push({ id: 'dept_' + Date.now(), name: 'New Dept', section_ids: [] });
             setForm(f => ({ ...f, departments: newDepts }));
           }}>+ ADD DEPARTMENT</button>
         </div>
