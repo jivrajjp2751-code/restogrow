@@ -256,7 +256,9 @@ export async function generateBill(orderId, paymentMode, discount) {
 
   const { data: configData } = await supabase.from('config').select('*').eq('restaurant_id', _restaurantId);
   const cfg = { taxRate: 0, serviceChargeRate: 0, restaurantName: 'RestoGrow', currency: '₹' };
-  configData?.forEach(r => { cfg[r.id] = r.value; });
+  configData?.forEach(r => { 
+    try { cfg[r.id] = JSON.parse(r.value); } catch { cfg[r.id] = r.value; }
+  });
 
   const subtotal = items.reduce((s, i) => s + ((i.price||0) * (i.quantity||i.qty||0)), 0);
   const taxAmount = (subtotal * (cfg.taxRate || 0)) / 100;
@@ -319,11 +321,17 @@ export async function generateBill(orderId, paymentMode, discount) {
       subtotal,
       taxAmount,
       taxRate: cfg.taxRate,
+      serviceCharge,
+      serviceChargeRate: cfg.serviceChargeRate,
       discount,
       discountAmount,
       tableNumber: order.tableLabel,
       restaurantName: cfg.restaurantName,
-      currency: cfg.currency
+      restaurantAddress: cfg.address || '',
+      restaurantPhone: cfg.phone || '',
+      gstNumber: cfg.gstNumber || '',
+      currency: cfg.currency,
+      billLayout: cfg.billLayout || {}
     } 
   };
 }

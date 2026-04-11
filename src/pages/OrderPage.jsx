@@ -6,12 +6,12 @@ import {
   createOrder, generateBill, cancelOrder, createPrintJob
 } from '../store/data';
 import { printSplitKOT, printBillDirect } from '../utils/print';
-import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, CreditCard, Banknote, Smartphone, Receipt } from 'lucide-react';
+import { Search, ArrowLeft, Plus, Minus, Trash2, StickyNote, Printer, CreditCard, Banknote, Smartphone, Receipt, Edit3 } from 'lucide-react';
 
 export default function OrderPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
-  const { tables = [], menuItems = [], config = {}, refresh, currentUser } = useApp();
+  const { tables = [], sections = [], menuItems = [], config = {}, refresh, currentUser } = useApp();
   const { addToast } = useToast();
   const isAdmin = currentUser?.role === 'admin';
 
@@ -28,6 +28,19 @@ export default function OrderPage() {
   const [discount, setDiscount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [orderLoading, setOrderLoading] = useState(true);
+
+  // Price editing state
+  const [priceEditModal, setPriceEditModal] = useState(null);
+  const [editPrice, setEditPrice] = useState('');
+
+  // Get section surcharge for the current table
+  const tableSurcharge = useMemo(() => {
+    if (!table?.sectionId || !sections?.length) return 0;
+    const section = sections.find(s => s.id === table.sectionId);
+    return section?.surcharge || 0;
+  }, [table, sections]);
+
+  const surchargeFactor = 1 + (tableSurcharge / 100);
 
   const loadOrder = useCallback(async () => {
     if (!tableId) return;
@@ -102,6 +115,27 @@ export default function OrderPage() {
     setNoteText('');
   };
 
+  // Price edit handlers
+  const openPriceEdit = (item) => {
+    setPriceEditModal(item);
+    setEditPrice(String(item.price || ''));
+  };
+
+  const handleSavePrice = async () => {
+    if (!priceEditModal || busy) return;
+    const newPrice = Number(editPrice);
+    if (isNaN(newPrice) || newPrice < 0) { addToast('Enter valid price', 'error'); return; }
+    setBusy(true);
+    try {
+      await updateOrderItem(order.id, priceEditModal.id, { price: newPrice });
+      await loadOrder();
+      addToast(`Price updated to ${config.currency}${newPrice}`, 'success');
+    } catch { addToast('Failed', 'error'); }
+    finally { setBusy(false); }
+    setPriceEditModal(null);
+    setEditPrice('');
+  };
+
   const handlePrintSplitKOT = async () => {
     if (!order || safeItems.length === 0) return;
     try {
@@ -136,6 +170,9 @@ export default function OrderPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px' }}>
           <button className="btn btn-ghost btn-icon" onClick={() => navigate('/tables')}><ArrowLeft size={16} /></button>
           <div style={{ fontWeight: 800, fontSize: '13px' }}>{table?.label || 'Table'}</div>
+          {tableSurcharge > 0 && (
+            <span className="badge badge-warning" style={{ fontSize: '9px' }}>+{tableSurcharge}% surcharge</span>
+          )}
         </div>
 
         <div className="search-input-wrapper">
@@ -152,12 +189,25 @@ export default function OrderPage() {
         </div>
 
         <div className="menu-items-grid compact" style={{ padding: '10px', overflowY: 'auto', height: 'calc(100% - 140px)' }}>
-          {deptItems.map(item => (
-            <div key={item.id} className="menu-item-card" onClick={() => handleAddItem(item)}>
-              <div className="menu-item-name">{item.name}</div>
-              <div className="menu-item-price">{config.currency}{item.price}</div>
-            </div>
-          ))}
+          {deptItems.map(item => {
+            // Show the surcharge-adjusted price in the menu
+            const displayPrice = tableSurcharge > 0
+              ? Math.round(item.price * surchargeFactor)
+              : item.price;
+            return (
+              <div key={item.id} className="menu-item-card" onClick={() => handleAddItem(item)}>
+                <div className="menu-item-name">{item.name}</div>
+                <div className="menu-item-price">
+                  {config.currency}{displayPrice}
+                  {tableSurcharge > 0 && (
+                    <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontWeight: 400, marginLeft: '4px', textDecoration: 'line-through' }}>
+                      {item.price}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -175,7 +225,14 @@ export default function OrderPage() {
                 <span className="qty-value">{item.quantity}</span>
                 <button className="qty-btn" onClick={() => handleQtyChange(item.id, 1)}>+</button>
               </div>
-              <div style={{ width: '60px', textAlign: 'right', fontWeight: 700 }}>{config.currency}{item.price * item.quantity}</div>
+              <div
+                style={{ width: '65px', textAlign: 'right', fontWeight: 700, cursor: 'pointer', color: 'var(--brand-success)', fontSize: '12px' }}
+                onClick={() => openPriceEdit(item)}
+                title="Click to edit price"
+              >
+                {config.currency}{item.price * item.quantity}
+                <Edit3 size={9} style={{ marginLeft: '2px', opacity: 0.5 }} />
+              </div>
               <button className="btn btn-ghost btn-sm" onClick={() => {setNoteModal(item); setNoteText(item.note||'');}}><StickyNote size={12}/></button>
             </div>
           ))}
@@ -192,6 +249,7 @@ export default function OrderPage() {
         </div>
       </div>
 
+      {/* Note Modal */}
       {noteModal && (
         <div className="modal-backdrop" onClick={() => setNoteModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{maxWidth:'300px'}}>
@@ -201,6 +259,46 @@ export default function OrderPage() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-primary" onClick={handleAddNote}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Price Edit Modal */}
+      {priceEditModal && (
+        <div className="modal-backdrop" onClick={() => setPriceEditModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '320px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">EDIT PRICE — {priceEditModal.name}</h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setPriceEditModal(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="input-group">
+                <label className="input-label">Price per unit ({config.currency})</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={editPrice}
+                  onChange={e => setEditPrice(e.target.value)}
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') handleSavePrice(); }}
+                  style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-mono)', textAlign: 'center' }}
+                />
+              </div>
+              <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                Original: {config.currency}{priceEditModal.price} × {priceEditModal.quantity} =
+                {config.currency}{priceEditModal.price * priceEditModal.quantity}
+              </p>
+              {editPrice && Number(editPrice) !== priceEditModal.price && (
+                <p style={{ fontSize: '10px', color: 'var(--brand-primary)', marginTop: '2px', fontWeight: 700 }}>
+                  New: {config.currency}{Number(editPrice)} × {priceEditModal.quantity} =
+                  {config.currency}{Number(editPrice) * priceEditModal.quantity}
+                </p>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setPriceEditModal(null)}>Cancel</button>
+              <button className="btn btn-success" onClick={handleSavePrice}>UPDATE PRICE</button>
             </div>
           </div>
         </div>

@@ -167,84 +167,275 @@ ${(order.items || []).map(i => `
 </body></html>`;
 }
 
-// ===== BILL =====
+// ===== BILL (matches thermal receipt layout) =====
 function buildBillHTML(bill) {
+  const layout = bill.billLayout || {};
+  const restaurantName = bill.restaurantName || layout.restaurantName || 'RESTAURANT';
+  const address = bill.restaurantAddress || layout.address || '';
+  const phone = bill.restaurantPhone || layout.phone || '';
+  const gstin = bill.gstNumber || layout.gstin || '';
+  const sacCode = layout.sacCode || '';
+  const serviceType = layout.serviceType || 'RESTAURANT SERVICES';
+  const footerLine1 = layout.footerLine1 || 'Thank you for your visit';
+  const footerLine2 = layout.footerLine2 || 'Have a nice day';
+  const footerLine3 = layout.footerLine3 || '';
+  const showCashier = layout.showCashier !== false;
+  const cashierName = bill.cashierName || layout.cashierName || '';
+  const waiterCode = bill.waiterCode || '';
+  const currency = bill.currency || '₹';
+  
+  // Tax breakdown — split GST into SGST & CGST
+  const subtotal = bill.subtotal || 0;
+  const taxRate = parseFloat(bill.taxRate) || 0;
+  const halfTaxRate = taxRate / 2;
+  const sgst = Math.round((subtotal * halfTaxRate) / 100 * 100) / 100;
+  const cgst = Math.round((subtotal * halfTaxRate) / 100 * 100) / 100;
+  const totalTax = sgst + cgst;
+  const discountAmount = bill.discountAmount || 0;
+  const serviceCharge = bill.serviceCharge || 0;
+  const total = bill.total || Math.round(subtotal + totalTax + serviceCharge - discountAmount);
+
+  const billDate = new Date(bill.createdAt || bill.created_at || Date.now());
+  const dateStr = `${billDate.toLocaleDateString('en-IN')} ${billDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+
   return `<!DOCTYPE html>
 <html><head><title>${bill.billNumber}</title>
 <style>
   @page { margin: 0; size: 80mm auto; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; width: 72mm; margin: 0 auto; padding: 4mm; font-size: 11px; color: #000; }
+  body { 
+    font-family: 'Courier New', monospace; 
+    width: 72mm; 
+    margin: 0 auto; 
+    padding: 4mm; 
+    font-size: 11px; 
+    color: #000; 
+  }
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .name { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
-  .sub { font-size: 9px; color: #444; }
-  .dash { border-top: 2px dashed #000; margin: 5px 0; }
-  .row { display: flex; justify-content: space-between; padding: 1px 0; }
-  .row-bold { display: flex; justify-content: space-between; padding: 2px 0; font-weight: bold; }
-  .total { font-size: 14px; font-weight: bold; }
-  .item-note { color: #666; font-style: italic; padding-left: 10px; font-size: 9px; }
-  .footer { text-align: center; font-size: 9px; color: #666; margin-top: 8px; }
+  .restaurant-name { 
+    font-size: 14px; 
+    font-weight: 900; 
+    text-align: center; 
+    margin-bottom: 2px; 
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .sub-info { 
+    font-size: 10px; 
+    text-align: center; 
+    color: #000; 
+    line-height: 1.4;
+  }
+  .sac-code {
+    font-size: 13px;
+    font-weight: 900;
+    text-align: center;
+    margin: 4px 0 2px;
+  }
+  .service-type {
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 2px;
+  }
+  .invoice-label {
+    font-size: 13px;
+    font-weight: 900;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .dot-line { 
+    border: none;
+    border-top: 1px dotted #000; 
+    margin: 4px 0; 
+  }
+  .dash-line { 
+    border: none;
+    border-top: 2px dashed #000; 
+    margin: 5px 0; 
+  }
+  .info-row { 
+    display: flex; 
+    justify-content: space-between; 
+    padding: 1px 0; 
+    font-size: 11px; 
+  }
+  .info-left { text-align: left; }
+  
+  /* Item table */
+  .item-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    font-size: 11px; 
+    margin: 2px 0;
+  }
+  .item-table th { 
+    text-align: left; 
+    padding: 2px 0; 
+    font-size: 10px; 
+    font-weight: 700; 
+    border-bottom: 1px dotted #000;
+  }
+  .item-table th:nth-child(2),
+  .item-table th:nth-child(3),
+  .item-table th:nth-child(4) { text-align: right; }
+  .item-table td { 
+    padding: 2px 0; 
+    vertical-align: top;
+  }
+  .item-table td:nth-child(2),
+  .item-table td:nth-child(3),
+  .item-table td:nth-child(4) { text-align: right; }
+  .item-table td:first-child { 
+    max-width: 100px; 
+    word-wrap: break-word; 
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  
+  /* Totals */
+  .subtotal-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .tax-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 1px 0;
+    font-size: 11px;
+  }
+  .tax-label { }
+  .tax-amount { min-width: 60px; text-align: right; }
+  
+  .grand-total {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 14px;
+    font-weight: 900;
+  }
+  
+  .cashier-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-size: 11px;
+    margin-top: 8px;
+  }
+  
+  .footer { 
+    text-align: center; 
+    font-size: 11px; 
+    margin-top: 8px; 
+    line-height: 1.6;
+  }
+  .footer-bold {
+    font-weight: 700;
+  }
 </style></head><body>
 
-<div class="center">
-  <div class="name">${bill.restaurantName || 'POS System'}</div>
-  ${bill.restaurantAddress ? `<div class="sub">${bill.restaurantAddress}</div>` : ''}
-  ${bill.restaurantPhone ? `<div class="sub">Tel: ${bill.restaurantPhone}</div>` : ''}
-  ${bill.gstNumber ? `<div class="sub">GST: ${bill.gstNumber}</div>` : ''}
+<div class="restaurant-name">${restaurantName}</div>
+${address ? `<div class="sub-info">${address}</div>` : ''}
+${phone ? `<div class="sub-info">PHONE NO :${phone}</div>` : ''}
+${gstin ? `<div class="sub-info">GSTIN :${gstin}</div>` : ''}
+${sacCode ? `<div class="sac-code">SAC ${sacCode}</div>` : ''}
+${serviceType ? `<div class="service-type">[${serviceType.toUpperCase()}]</div>` : ''}
+<div class="invoice-label">[INVOICE]</div>
+
+<hr class="dot-line" />
+
+<div class="info-row"><span>Bill No.: ${bill.billNumber || ''}</span></div>
+<div class="info-row"><span>Date :${dateStr}</span></div>
+
+<hr class="dot-line" />
+
+<div class="info-row">
+  <span>Table No.: ${bill.tableNumber || ''}</span>
+  <span>Waiter Code: ${waiterCode}</span>
 </div>
 
-<div class="dash"></div>
+<hr class="dot-line" />
 
-<div class="row">
-  <span>${bill.billNumber}</span>
-  <span>T${bill.tableNumber}</span>
-</div>
-<div class="row sub">
-  <span>${new Date(bill.createdAt || bill.created_at).toLocaleDateString()}</span>
-  <span>${new Date(bill.createdAt || bill.created_at).toLocaleTimeString()}</span>
-</div>
-${bill.customerName ? `<div class="row sub"><span>Customer: ${bill.customerName}</span></div>` : ''}
+<table class="item-table">
+  <thead>
+    <tr>
+      <th>Item Name</th>
+      <th>Qty.</th>
+      <th>Price</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${(bill.items || []).map(i => {
+      const qty = i.quantity || 1;
+      const price = i.price || 0;
+      const value = price * qty;
+      return `<tr>
+        <td>${(i.name || '').toUpperCase()}</td>
+        <td>${qty.toFixed(2)}</td>
+        <td>${price.toFixed(1)}</td>
+        <td>${value.toFixed(2)}</td>
+      </tr>`;
+    }).join('')}
+  </tbody>
+</table>
 
-<div class="dash"></div>
+<hr class="dot-line" />
 
-<div class="row bold" style="font-size:10px">
-  <span>ITEM</span>
-  <span>AMT</span>
-</div>
-<div style="border-top:1px solid #000;margin:2px 0"></div>
-
-${(bill.items || []).map(i => `
-<div class="row">
-  <span>${i.name} ×${i.quantity}</span>
-  <span>₹${i.price * i.quantity}</span>
-</div>
-${i.note ? `<div class="item-note">→ ${i.note}</div>` : ''}
-`).join('')}
-
-<div class="dash"></div>
-
-<div class="row"><span>Subtotal</span><span>₹${bill.subtotal}</span></div>
-${bill.taxAmount > 0 ? `<div class="row"><span>Tax ${bill.taxRate}%</span><span>₹${Math.round(bill.taxAmount)}</span></div>` : ''}
-${bill.serviceCharge > 0 ? `<div class="row"><span>Service ${bill.serviceChargeRate}%</span><span>₹${Math.round(bill.serviceCharge)}</span></div>` : ''}
-${bill.discountAmount > 0 ? `<div class="row"><span>Discount ${bill.discount}%</span><span>-₹${Math.round(bill.discountAmount)}</span></div>` : ''}
-
-<div class="dash"></div>
-
-<div class="row total">
-  <span>TOTAL</span>
-  <span>₹${bill.total}</span>
+<div class="subtotal-row">
+  <span>SUB TOTAL</span>
+  <span>${subtotal.toFixed(2)}</span>
 </div>
 
-<div style="margin-top:4px" class="row sub">
-  <span>Payment: ${bill.paymentMode}</span>
+${taxRate > 0 ? `
+<br/>
+<div class="tax-row">
+  <span class="tax-label">Add S GST(${halfTaxRate.toFixed(3)}%) on ${subtotal.toFixed(2)}</span>
+  <span class="tax-amount">${sgst.toFixed(2)}</span>
+</div>
+<div class="tax-row">
+  <span class="tax-label">Add C GST(${halfTaxRate.toFixed(3)}%) on ${subtotal.toFixed(2)}</span>
+  <span class="tax-amount">${cgst.toFixed(2)}</span>
+</div>
+` : ''}
+
+${discountAmount > 0 ? `
+<div class="tax-row">
+  <span class="tax-label">Discount ${bill.discount || 0}%</span>
+  <span class="tax-amount">-${discountAmount.toFixed(2)}</span>
+</div>
+` : ''}
+
+${serviceCharge > 0 ? `
+<div class="tax-row">
+  <span class="tax-label">Service Charge</span>
+  <span class="tax-amount">${serviceCharge.toFixed(2)}</span>
+</div>
+` : ''}
+
+<div class="grand-total">
+  <span>Amount Incl of All Taxes</span>
+  <span>${total.toFixed(2)}</span>
 </div>
 
-<div class="dash"></div>
+<hr class="dash-line" />
+
+${showCashier ? `
+<div class="cashier-row">
+  <span>Cashier : ${cashierName}</span>
+  <span>E & C E</span>
+</div>
+` : ''}
 
 <div class="footer">
-  <p>Thank you for visiting!</p>
-  <p style="margin-top:4px">--- End ---</p>
+  <div class="footer-bold">${footerLine1}</div>
+  ${footerLine2 ? `<div class="footer-bold">${footerLine2}</div>` : ''}
+  ${footerLine3 ? `<div style="margin-top:4px">${footerLine3}</div>` : ''}
 </div>
 
 </body></html>`;

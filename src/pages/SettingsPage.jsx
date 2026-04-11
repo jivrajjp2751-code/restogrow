@@ -1,18 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { updateConfig } from '../store/data';
-import { Settings, Store, Receipt, RefreshCw } from 'lucide-react';
+import { Settings, Store, Receipt, RefreshCw, FileText, Printer } from 'lucide-react';
+
+const DEFAULT_BILL_LAYOUT = {
+  restaurantName: '',
+  address: '',
+  phone: '',
+  gstin: '',
+  sacCode: '',
+  serviceType: 'RESTAURANT SERVICES',
+  cashierName: '',
+  footerLine1: 'Thank you for your visit',
+  footerLine2: 'Have a nice day',
+  footerLine3: '',
+  showCashier: true,
+  showWaiter: true,
+  showSACCode: true,
+};
 
 export default function SettingsPage() {
   const { config = {}, refresh } = useApp();
   const { addToast } = useToast();
   const [form, setForm] = useState({ ...config });
+  const [billLayout, setBillLayout] = useState({ ...DEFAULT_BILL_LAYOUT, ...(config.billLayout || {}) });
 
   const [isPrintStation, setIsPrintStation] = useState(localStorage.getItem('isPrintStation') === 'true');
 
+  // Sync billLayout into form on change
+  useEffect(() => {
+    setForm(f => ({ ...f, billLayout }));
+  }, [billLayout]);
+
   const handleSave = async () => {
     try { 
-      await updateConfig(form); 
+      await updateConfig({ ...form, billLayout }); 
       localStorage.setItem('isPrintStation', isPrintStation);
       refresh(); 
       addToast('Settings saved', 'success'); 
@@ -53,10 +75,100 @@ export default function SettingsPage() {
             <input className="input" value={form.gstNumber} onChange={e => setForm(f => ({ ...f, gstNumber: e.target.value }))} /></div>
           <div className="input-group"><label className="input-label">Currency</label>
             <input className="input" value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))} /></div>
-          <div className="input-group"><label className="input-label">Tax Rate (%)</label>
-            <input type="number" className="input" value={form.taxRate} onChange={e => setForm(f => ({ ...f, taxRate: Number(e.target.value) }))} min="0" max="100" /></div>
+          <div className="input-group"><label className="input-label">Tax Rate (%) — Split into SGST + CGST</label>
+            <input type="number" className="input" value={form.taxRate} onChange={e => setForm(f => ({ ...f, taxRate: Number(e.target.value) }))} min="0" max="100" />
+            <p style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+              e.g. 5% → SGST 2.5% + CGST 2.5%
+            </p>
+          </div>
           <div className="input-group"><label className="input-label">Service Charge (%)</label>
             <input type="number" className="input" value={form.serviceChargeRate} onChange={e => setForm(f => ({ ...f, serviceChargeRate: Number(e.target.value) }))} min="0" max="100" /></div>
+        </div>
+      </div>
+
+      {/* ===== BILL LAYOUT EDITOR ===== */}
+      <div className="config-section" style={{ borderColor: 'rgba(94, 92, 230, 0.3)' }}>
+        <h3 className="config-section-title"><FileText size={14} /> BILL LAYOUT / RECEIPT DESIGN</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '12px' }}>
+          Customize what appears on your printed bill / thermal receipt. All fields are optional.
+        </p>
+
+        <div className="config-grid">
+          <div className="input-group">
+            <label className="input-label">Restaurant Name (on bill)</label>
+            <input className="input" value={billLayout.restaurantName} placeholder={form.restaurantName || 'e.g. AMRIK SUKHDEV VAISHNO DHABA'}
+              onChange={e => setBillLayout(f => ({ ...f, restaurantName: e.target.value }))} />
+            <p style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Leave blank to use the restaurant name from above.</p>
+          </div>
+          <div className="input-group">
+            <label className="input-label">Address (on bill)</label>
+            <input className="input" value={billLayout.address} placeholder="e.g. G.T. ROAD, MURTHAL, SONIPAT"
+              onChange={e => setBillLayout(f => ({ ...f, address: e.target.value }))} />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Phone (on bill)</label>
+            <input className="input" value={billLayout.phone} placeholder="e.g. 7082135999, 7082134999"
+              onChange={e => setBillLayout(f => ({ ...f, phone: e.target.value }))} />
+          </div>
+          <div className="input-group">
+            <label className="input-label">GSTIN (on bill)</label>
+            <input className="input" value={billLayout.gstin} placeholder="e.g. 06ABIFS3901K1Z3"
+              onChange={e => setBillLayout(f => ({ ...f, gstin: e.target.value }))} />
+          </div>
+          <div className="input-group">
+            <label className="input-label">SAC Code</label>
+            <input className="input" value={billLayout.sacCode} placeholder="e.g. 996331"
+              onChange={e => setBillLayout(f => ({ ...f, sacCode: e.target.value }))} />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Service Type Label</label>
+            <input className="input" value={billLayout.serviceType} placeholder="e.g. RESTAURANT SERVICES"
+              onChange={e => setBillLayout(f => ({ ...f, serviceType: e.target.value }))} />
+          </div>
+        </div>
+
+        <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>FOOTER / THANK-YOU MESSAGE</div>
+          <div className="config-grid">
+            <div className="input-group">
+              <label className="input-label">Footer Line 1</label>
+              <input className="input" value={billLayout.footerLine1}
+                onChange={e => setBillLayout(f => ({ ...f, footerLine1: e.target.value }))} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Footer Line 2</label>
+              <input className="input" value={billLayout.footerLine2}
+                onChange={e => setBillLayout(f => ({ ...f, footerLine2: e.target.value }))} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Footer Line 3 (optional)</label>
+              <input className="input" value={billLayout.footerLine3} placeholder="e.g. जल ही जीवन है।"
+                onChange={e => setBillLayout(f => ({ ...f, footerLine3: e.target.value }))} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Default Cashier Name</label>
+              <input className="input" value={billLayout.cashierName} placeholder="e.g. CN"
+                onChange={e => setBillLayout(f => ({ ...f, cashierName: e.target.value }))} />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>SHOW/HIDE FIELDS</div>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            {[
+              { key: 'showCashier', label: 'Cashier Name' },
+              { key: 'showWaiter', label: 'Waiter Code' },
+              { key: 'showSACCode', label: 'SAC Code' },
+            ].map(opt => (
+              <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={billLayout[opt.key] !== false}
+                  onChange={e => setBillLayout(f => ({ ...f, [opt.key]: e.target.checked }))}
+                  style={{ width: '16px', height: '16px' }} />
+                {opt.label}
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 

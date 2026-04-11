@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
-import { addStock, addMenuItem, getInventoryLog, getLowStockItems } from '../store/data';
-import { Package, AlertTriangle, Plus, Search, Wine, Coffee, Trash2 } from 'lucide-react';
+import { addStock, addMenuItem, deleteMenuItem, updateMenuItem, getInventoryLog, getLowStockItems } from '../store/data';
+import { Package, AlertTriangle, Plus, Search, Wine, Coffee, Trash2, Edit3 } from 'lucide-react';
 
 export default function InventoryPage() {
   const { menuItems = [], inventory_log = [], config = {}, refresh, currentUser } = useApp();
@@ -15,6 +15,12 @@ export default function InventoryPage() {
   const [addItemModal, setAddItemModal] = useState(null); // department ID
   const [newItemForm, setNewItemForm] = useState({
     name: '', code: '', price: '', buyingPrice: '', deptId: '', stock: '50', unit: 'bottle', isVeg: true,
+  });
+
+  // Edit item modal state
+  const [editItemModal, setEditItemModal] = useState(null);
+  const [editItemForm, setEditItemForm] = useState({
+    name: '', code: '', price: '', buyingPrice: '', stock: '',
   });
 
   const lowStockItems = useMemo(() => getLowStockItems(menuItems), [menuItems]);
@@ -59,6 +65,44 @@ export default function InventoryPage() {
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
   };
 
+  const handleDeleteItem = async (item) => {
+    if (!confirm(`Delete "${item.name}" from inventory? This cannot be undone.`)) return;
+    try {
+      await deleteMenuItem(item.id);
+      refresh();
+      addToast(`${item.name} deleted`, 'info');
+    } catch (e) { addToast('Delete failed: ' + e.message, 'error'); }
+  };
+
+  const openEditItem = (item) => {
+    setEditItemForm({
+      name: item.name || '',
+      code: item.code || '',
+      price: item.price || '',
+      buyingPrice: item.buyingPrice || '',
+      stock: item.stock || 0,
+    });
+    setEditItemModal(item);
+  };
+
+  const handleEditItem = async () => {
+    if (!editItemModal) return;
+    if (!editItemForm.name || !editItemForm.price) { addToast('Name & Price required', 'error'); return; }
+    try {
+      await updateMenuItem(editItemModal.id, {
+        name: editItemForm.name,
+        code: editItemForm.code,
+        price: Number(editItemForm.price),
+        buyingPrice: Number(editItemForm.buyingPrice) || 0,
+        stock: Number(editItemForm.stock) || 0,
+        deptId: editItemModal.deptId,
+      });
+      refresh();
+      addToast(`${editItemForm.name} updated`, 'success');
+      setEditItemModal(null);
+    } catch (e) { addToast('Update failed: ' + e.message, 'error'); }
+  };
+
   return (
     <div className="page-content">
       <div className="page-header">
@@ -100,7 +144,7 @@ export default function InventoryPage() {
                         <th>SELLING</th>
                         <th>STOCK</th>
                         <th>STATUS</th>
-                        <th>ACTION</th>
+                        <th>ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -122,7 +166,11 @@ export default function InventoryPage() {
                             {item.stock <= 0 ? <span className="badge badge-danger">OUT</span> : item.stock <= 10 ? <span className="badge badge-warning">LOW</span> : <span className="badge badge-success">OK</span>}
                           </td>
                           <td>
-                            <button className="btn btn-sm btn-secondary" onClick={() => { setStockModal(item); setAddQty(''); }}>+ STOCK</button>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button className="btn btn-sm btn-secondary" onClick={() => { setStockModal(item); setAddQty(''); }}>+ STOCK</button>
+                              <button className="btn btn-sm btn-ghost" title="Edit item" onClick={() => openEditItem(item)}><Edit3 size={12} /></button>
+                              <button className="btn btn-sm btn-ghost" style={{ color: 'var(--brand-danger)' }} title="Delete item" onClick={() => handleDeleteItem(item)}><Trash2 size={12} /></button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -151,7 +199,7 @@ export default function InventoryPage() {
                   <td>{item.name}</td>
                   <td style={{ color: 'var(--brand-danger)', fontWeight: 700 }}>{item.stock} {item.unit}</td>
                   <td>
-                    <button className="btn btn-sm btn-primary" onClick={() => { setStockModal(item); setAddQty(''); }}>+ REFALL</button>
+                    <button className="btn btn-sm btn-primary" onClick={() => { setStockModal(item); setAddQty(''); }}>+ REFILL</button>
                   </td>
                 </tr>
               ))}
@@ -233,6 +281,46 @@ export default function InventoryPage() {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setAddItemModal(null)}>Cancel</button>
               <button className="btn btn-success btn-lg" onClick={handleAddNewItem} style={{ width: '100%' }}>ADD TO INVENTORY</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Item Modal */}
+      {editItemModal && (
+        <div className="modal-backdrop" onClick={() => setEditItemModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">EDIT — {editItemModal.name}</h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setEditItemModal(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="input-group">
+                <label className="input-label">Item Name *</label>
+                <input className="input" value={editItemForm.name} onChange={e => setEditItemForm(f => ({ ...f, name: e.target.value }))} autoFocus />
+              </div>
+              <div className="config-grid">
+                <div className="input-group">
+                  <label className="input-label">Code</label>
+                  <input className="input" value={editItemForm.code} onChange={e => setEditItemForm(f => ({ ...f, code: e.target.value }))} />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Selling Price ({config.currency}) *</label>
+                  <input type="number" className="input" value={editItemForm.price} onChange={e => setEditItemForm(f => ({ ...f, price: e.target.value }))} />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Buying Price ({config.currency})</label>
+                  <input type="number" className="input" value={editItemForm.buyingPrice} onChange={e => setEditItemForm(f => ({ ...f, buyingPrice: e.target.value }))} />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Current Stock</label>
+                  <input type="number" className="input" value={editItemForm.stock} onChange={e => setEditItemForm(f => ({ ...f, stock: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setEditItemModal(null)}>Cancel</button>
+              <button className="btn btn-primary btn-lg" onClick={handleEditItem} style={{ width: '100%' }}>SAVE CHANGES</button>
             </div>
           </div>
         </div>
