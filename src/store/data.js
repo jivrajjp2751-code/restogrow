@@ -120,6 +120,7 @@ export async function syncAll() {
 
 // ===== GENERIC HELPERS =====
 async function dbInsert(table, data) {
+  if (!_restaurantId) throw new Error('No restaurant ID set. Please reload the page.');
   const payload = { ...data, restaurant_id: _restaurantId };
   const { data: result, error } = await supabase
     .from(table)

@@ -45,8 +45,11 @@ export default function StaffMobileDashboard() {
     try {
       const o = await getOrderForTable(selectedTableId);
       setOrder(o);
-    } catch { setOrder(null); }
-  }, [selectedTableId]);
+    } catch (e) { 
+      setOrder(null); 
+      addToast(`Order Load Error: ${e.message}`, 'error');
+    }
+  }, [selectedTableId, addToast]);
 
   useEffect(() => { loadOrder(); }, [loadOrder]);
 
@@ -81,13 +84,17 @@ export default function StaffMobileDashboard() {
   };
 
   const handleAddItem = async (menuItem) => {
-    if (!order || busy) return;
+    if (!order) { addToast('No active order. Reloading...', 'warning'); loadOrder(); return; }
+    if (busy) return;
     setBusy(true);
     try {
       await addItemToOrder(order.id, { ...menuItem, categoryType: menuItem.deptId || 'bar' });
       await loadOrder();
       addToast(`+ ${menuItem.name}`, 'success');
-    } catch { addToast('Failed', 'error'); }
+    } catch (e) { 
+      console.error(e);
+      addToast(`Error adding ${menuItem.name}: ${e.message}`, 'error'); 
+    }
     finally { setBusy(false); }
   };
 
