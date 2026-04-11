@@ -65,48 +65,49 @@ export async function syncAll() {
       
       if (!res.data) return;
 
+      // NORMALIZE ALL DATA IN SYNCALL
+      const normalizedData = res.data.map(row => ({
+        ...row,
+        tableId: row.tableId || row.table_id || row.table_no,
+        orderId: row.orderId || row.order_id,
+        menuItemId: row.menuItemId || row.menu_item_id,
+        categoryType: row.categoryType || row.category_type,
+        sessionId: row.sessionId || row.session_id,
+        createdAt: row.createdAt || row.created_at,
+        billNumber: row.billNumber || row.bill_number,
+        paymentMode: row.paymentMode || row.payment_mode
+      }));
+
       if (tableName === 'config') {
         const cfg = { restaurantName: 'RestoGrow', currency: '₹', taxRate: 0, serviceChargeRate: 0 };
-        res.data.forEach(r => {
+        normalizedData.forEach(r => {
           try { cfg[r.id] = JSON.parse(r.value); } catch { cfg[r.id] = r.value; }
         });
         results.config = cfg;
       } else {
-        results[tableName] = res.data;
+        results[tableName] = normalizedData;
       }
     });
 
-    // Pre-process items into Maps for O(N) lookups instead of O(N^2)
+    // Post-process items into Maps
     const orderItemsMap = {};
     (results.order_items || []).forEach(item => {
-      item.orderId = item.orderId || item.order_id;
-      item.menuItemId = item.menuItemId || item.menu_item_id;
-      item.categoryType = item.categoryType || item.category_type;
       if (!orderItemsMap[item.orderId]) orderItemsMap[item.orderId] = [];
       orderItemsMap[item.orderId].push(item);
     });
 
     const billItemsMap = {};
     (results.bill_items || []).forEach(item => {
-      item.billId = item.billId || item.bill_id;
-      item.categoryType = item.categoryType || item.category_type;
       item.quantity = item.quantity || item.qty || 0;
       if (!billItemsMap[item.billId]) billItemsMap[item.billId] = [];
       billItemsMap[item.billId].push(item);
     });
 
-    // Map snake_case database records to camelCase for UI faster
     (results.orders || []).forEach(o => {
-      o.tableId = o.tableId || o.table_id;
       o.items = orderItemsMap[o.id] || [];
     });
     
     (results.bills || []).forEach(b => {
-      b.orderId = b.orderId || b.order_id;
-      b.billNumber = b.billNumber || b.bill_number;
-      b.paymentMode = b.paymentMode || b.payment_mode;
-      b.sessionId = b.sessionId || b.session_id;
-      b.createdAt = b.createdAt || b.created_at;
       b.items = billItemsMap[b.id] || [];
     });
 
@@ -200,9 +201,16 @@ export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
 export async function createOrder(tableId, tableLabel, customerName, createdBy) {
   const orderId = getUUID();
-  const order = await dbInsert('orders', { 
-    id: orderId, tableId: tableId, tableLabel, status: 'active', createdBy,
-  });
+  const orderData = { 
+    id: orderId,
+    tableId: tableId, 
+    table_id: tableId, // Defensive
+    tableLabel, 
+    status: 'active', 
+    customerName,
+    createdBy,
+  };
+  const order = await dbInsert('orders', orderData);
   await dbUpdate('tables', tableId, { status: 'occupied' });
   return order;
 }
