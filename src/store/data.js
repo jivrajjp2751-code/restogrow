@@ -235,10 +235,11 @@ export async function cancelOrder(orderId, tableId) {
 }
 
 export async function addItemToOrder(orderId, item) {
-  // 1. Get order's table and section surcharge - checking BOTH column names for safety
+  // 1. Get order's table and section surcharge
   const { data: orderData, error: oErr } = await supabase.from('orders')
     .select('tableId, table_id')
     .eq('id', orderId)
+    .eq('restaurant_id', _restaurantId)
     .single();
     
   if (oErr) {
@@ -253,6 +254,7 @@ export async function addItemToOrder(orderId, item) {
     const { data: table } = await supabase.from('tables')
       .select('sectionId, section_id')
       .eq('id', tableId)
+      .eq('restaurant_id', _restaurantId)
       .single();
       
     const sectionId = table?.sectionId || table?.section_id;
@@ -260,6 +262,7 @@ export async function addItemToOrder(orderId, item) {
       const { data: section } = await supabase.from('sections')
         .select('surcharge, surchargeDepts, surcharge_depts')
         .eq('id', sectionId)
+        .eq('restaurant_id', _restaurantId)
         .single();
         
       if (section) {
@@ -290,11 +293,11 @@ export async function addItemToOrder(orderId, item) {
 
 export async function generateBill(orderId, discount) {
   // 1. Get Order & Items
-  const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).single();
+  const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).eq('restaurant_id', _restaurantId).single();
   if (orderErr) throw orderErr;
   
   // orderId is the actual column name in the DB
-  const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('orderId', orderId);
+  const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('orderId', orderId).eq('restaurant_id', _restaurantId);
   if (itemsErr) throw itemsErr;
 
   const { data: configData } = await supabase.from('config').select('*').eq('restaurant_id', _restaurantId);
@@ -343,17 +346,17 @@ export async function generateBill(orderId, discount) {
     if (biErr) throw new Error(`bill_items insert failed: ${biErr.message}`);
   }
 
-  await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
-  await supabase.from('tables').update({ status: 'available' }).eq('id', order.tableId);
+  await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId).eq('restaurant_id', _restaurantId);
+  await dbUpdate('tables', order.tableId, { status: 'available' }); // using dbUpdate inherently scopes to restaurant_id
 
   // Deduct stock
   for (const item of items) {
     const mid = item.menuItemId || item.menu_item_id;
     if (!mid) continue;
-    const { data: menuI } = await supabase.from('menu_items').select('stock').eq('id', mid).single();
+    const { data: menuI } = await supabase.from('menu_items').select('stock').eq('id', mid).eq('restaurant_id', _restaurantId).single();
     if (menuI) {
       const newStock = Math.max(0, menuI.stock - (item.quantity || 1));
-      await supabase.from('menu_items').update({ stock: newStock }).eq('id', mid);
+      await dbUpdate('menu_items', mid, { stock: newStock }); // using dbUpdate handles restaurant_id
     }
   }
 
@@ -423,12 +426,14 @@ export async function getOrderForTable(tableId) {
     // Fetch items with dual-naming support
     let { data: items } = await supabase.from('order_items')
       .select('*')
-      .eq('order_id', order.id);
+      .eq('order_id', order.id)
+      .eq('restaurant_id', _restaurantId);
 
     if (!items || items.length === 0) {
       const res = await supabase.from('order_items')
         .select('*')
-        .eq('orderId', order.id);
+        .eq('orderId', order.id)
+        .eq('restaurant_id', _restaurantId);
       items = res.data;
     }
       
@@ -471,7 +476,7 @@ export async function addInventoryLog(data) {
 export async function addStock(menuItemId, qty, reason) {
   // Step 1: Get item info
   const { data: item, error: itmErr } = await supabase
-    .from('menu_items').select('*').eq('id', menuItemId).single();
+    .from('menu_items').select('*').eq('id', menuItemId).eq('restaurant_id', _restaurantId).single();
   if (itmErr || !item) throw new Error('Menu item not found: ' + (itmErr?.message || 'unknown'));
 
   // Step 2: Update stock (this is the critical part - must succeed)
