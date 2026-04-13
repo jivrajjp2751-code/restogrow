@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
-  LayoutGrid, ClipboardList,
-  Receipt, Package, Settings, Users, LogOut, Sun, Moon, TrendingUp, Play
+  LayoutGrid,
+  Receipt, Package, Settings, Users, LogOut, TrendingUp, Play
 } from 'lucide-react';
 
 const navItems = [

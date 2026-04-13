@@ -11,7 +11,7 @@ import { printSplitKOT } from '../utils/print';
 export default function OrderPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
-  const { tables = [], sections = [], menuItems = [], config = {}, refresh, currentUser } = useApp();
+  const { tables = [], sections = [], menuItems = [], config = {}, refresh } = useApp();
   const { addToast } = useToast();
 
   const table = useMemo(() => (tables || []).find(t => t.id === tableId), [tables, tableId]);
@@ -24,7 +24,7 @@ export default function OrderPage() {
     });
   }, [config, table]);
   const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id);
-  useEffect(() => { if (!activeDeptId && depts.length > 0) setActiveDeptId(depts[0].id); }, [depts]);
+  useEffect(() => { if (!activeDeptId && depts.length > 0) setActiveDeptId(depts[0].id); }, [depts, activeDeptId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [noteModal, setNoteModal] = useState(null);
   const [noteText, setNoteText] = useState('');
@@ -40,7 +40,7 @@ export default function OrderPage() {
   }, [table, sections]);
 
   const tableSurcharge = sectionInfo?.surcharge || 0;
-  const surchargeDepts = sectionInfo?.surchargeDepts || [];
+  const surchargeDepts = useMemo(() => sectionInfo?.surchargeDepts || [], [sectionInfo]);
 
   const loadOrder = useCallback(async () => {
     if (!tableId) return;
@@ -52,7 +52,7 @@ export default function OrderPage() {
         refresh();
       }
       setOrder(existingOrder);
-    } catch (e) {
+    } catch {
       addToast('Order loading failed', 'error');
     } finally {
       setOrderLoading(false);

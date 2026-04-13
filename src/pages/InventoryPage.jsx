@@ -1,12 +1,11 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { addStock, addMenuItem, deleteMenuItem, updateMenuItem, getInventoryLog, getLowStockItems } from '../store/data';
 import { Package, AlertTriangle, Plus, Search, Wine, Coffee, Trash2, Edit3 } from 'lucide-react';
 
 export default function InventoryPage() {
-  const { menuItems = [], inventory_log = [], config = {}, refresh, currentUser, sections = [] } = useApp();
+  const { menuItems = [], inventory_log = [], config = {}, refresh, sections = [] } = useApp();
   const { addToast } = useToast();
-  const isAdmin = currentUser?.role === 'admin';
 
   const [activeTab, setActiveTab] = useState('stock');
   const [selectedDeptTab, setSelectedDeptTab] = useState('kitchen');
@@ -25,7 +24,8 @@ export default function InventoryPage() {
   });
 
   const lowStockItems = useMemo(() => getLowStockItems(menuItems), [menuItems]);
-  const inventoryLog = useMemo(() => getInventoryLog(inventory_log).reverse().slice(0, 50), [inventory_log]);
+  // Inventory log available via: getInventoryLog(inventory_log)
+  const _inventoryLog = useMemo(() => getInventoryLog(inventory_log).reverse().slice(0, 50), [inventory_log]);
 
   const searchFiltered = useMemo(() => menuItems.filter(i =>
     !searchQuery || i.name?.toLowerCase().includes(searchQuery.toLowerCase()) || i.code?.toLowerCase().includes(searchQuery.toLowerCase())

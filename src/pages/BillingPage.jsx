@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
-import { generateBill, createPrintJob, cancelOrder } from '../store/data';
-import { CreditCard, Banknote, Smartphone, ArrowLeft, Printer, XCircle } from 'lucide-react';
+import { generateBill, createPrintJob, cancelOrder, settleBill } from '../store/data';
+import { CreditCard, Banknote, Smartphone, ArrowLeft, Printer, XCircle, CheckCircle } from 'lucide-react';
 import { printBillDirect } from '../utils/print';
 
 export default function BillingPage() {
@@ -12,10 +12,13 @@ export default function BillingPage() {
   const { addToast } = useToast();
 
   const order = (orders || []).find(o => o.id === orderId);
-  const [paymentMode, setPaymentMode] = useState('Cash');
   const [discount, setDiscount] = useState(0);
   const [generatedBill, setGeneratedBill] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  // Settlement state
+  const [settlementMode, setSettlementMode] = useState('Cash');
+  const [settled, setSettled] = useState(false);
 
   if (!order && !generatedBill) {
     return (
@@ -42,7 +45,7 @@ export default function BillingPage() {
     if (busy) return;
     setBusy(true);
     try {
-      const result = await generateBill(orderId, paymentMode, discount);
+      const result = await generateBill(orderId, discount);
       if (result.bill) {
         result.bill.billLayout = billLayout;
         result.bill.cashierName = currentUser?.name || currentUser?.email || '';
@@ -66,6 +69,18 @@ export default function BillingPage() {
         addToast('Bill sent to printer queue', 'success');
       }
     } catch (e) { addToast('Print failed: ' + e.message, 'error'); }
+  };
+
+  const handleSettlement = async () => {
+    if (!generatedBill || busy) return;
+    setBusy(true);
+    try {
+      await settleBill(generatedBill.id, settlementMode);
+      setSettled(true);
+      refresh();
+      addToast(`Bill settled via ${settlementMode}`, 'success');
+    } catch (e) { addToast('Settlement failed: ' + e.message, 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleCancelOrder = async () => {
@@ -99,7 +114,6 @@ export default function BillingPage() {
   const pTableLabel = isGenerated ? generatedBill.tableNumber : order.tableNumber;
   const pBillNumber = isGenerated ? generatedBill.billNumber : 'DRAFT';
   const pDate = isGenerated ? new Date(generatedBill.createdAt || Date.now()).toLocaleString('en-IN') : new Date().toLocaleString('en-IN');
-  const pPaymentMode = isGenerated ? generatedBill.paymentMode : paymentMode;
   const pCashierName = isGenerated ? generatedBill.cashierName : (currentUser?.name || 'CN');
 
   return (
@@ -113,9 +127,41 @@ export default function BillingPage() {
                <div style={{ fontSize: '48px', color: 'var(--brand-success)', marginBottom: '16px' }}>✓</div>
                <div style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>BILL GENERATED</div>
                <div style={{ fontSize: '14px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: '32px' }}>{generatedBill.billNumber}</div>
-               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+               
+               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
                  <button className="btn btn-secondary btn-lg" onClick={() => navigate('/tables')}>BACK TO TABLES</button>
                  <button className="btn btn-success btn-lg" onClick={handlePrintBill}><Printer size={16} /> PRINT BILL</button>
+               </div>
+
+               {/* Settlement Section */}
+               <div style={{ marginTop: '32px', padding: '24px', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                 {settled ? (
+                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--brand-success)', fontWeight: 700, fontSize: '14px' }}>
+                     <CheckCircle size={18} /> SETTLED VIA {settlementMode.toUpperCase()}
+                   </div>
+                 ) : (
+                   <>
+                     <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)', marginBottom: '12px', color: 'var(--text-secondary)' }}>SETTLEMENT</div>
+                     <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>Select how the customer paid. This is for reports only — not shown on the bill.</p>
+                     <div className="payment-modes" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                       {[
+                         { mode: 'Cash', icon: Banknote },
+                         { mode: 'Card', icon: CreditCard },
+                         { mode: 'UPI', icon: Smartphone },
+                       ].map(p => (
+                         <button key={p.mode} type="button"
+                           className={`payment-mode-btn ${settlementMode === p.mode ? 'active' : ''}`}
+                           onClick={() => setSettlementMode(p.mode)}>
+                           <p.icon size={18} />
+                           <span>{p.mode}</span>
+                         </button>
+                       ))}
+                     </div>
+                     <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={handleSettlement} disabled={busy}>
+                       <CheckCircle size={16} /> SETTLE — {settlementMode.toUpperCase()}
+                     </button>
+                   </>
+                 )}
                </div>
              </div>
           ) : (
@@ -153,26 +199,10 @@ export default function BillingPage() {
                  </div>
                </div>
 
-               {/* Payment Methods */}
+               {/* Discount Only (no payment method) */}
                <div className="card" style={{ marginBottom: '12px' }}>
                  <div className="card-body">
-                   <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)', marginBottom: '8px', color: 'var(--text-secondary)' }}>PAYMENT METHOD</div>
-                   <div className="payment-modes" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                     {[
-                       { mode: 'Cash', icon: Banknote },
-                       { mode: 'Card', icon: CreditCard },
-                       { mode: 'UPI', icon: Smartphone },
-                     ].map(p => (
-                       <button key={p.mode} type="button"
-                         className={`payment-mode-btn ${paymentMode === p.mode ? 'active' : ''}`}
-                         onClick={() => setPaymentMode(p.mode)}>
-                         <p.icon size={18} />
-                         <span>{p.mode}</span>
-                       </button>
-                     ))}
-                   </div>
-
-                   <div className="input-group" style={{ marginTop: '16px' }}>
+                   <div className="input-group">
                      <label className="input-label">Discount (%)</label>
                      <input type="number" className="input" value={discount}
                        onChange={e => setDiscount(Math.max(0, Math.min(100, Number(e.target.value))))}
@@ -198,7 +228,7 @@ export default function BillingPage() {
                </div>
 
                <button className="btn btn-success btn-lg" style={{ width: '100%', fontSize: '14px' }} onClick={handleGenerateBill} disabled={busy}>
-                 COMPLETE — {config.currency}{Math.round(total)}
+                 GENERATE BILL — {config.currency}{Math.round(total)}
                </button>
              </>
           )}
@@ -239,7 +269,7 @@ export default function BillingPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Table No.: {pTableLabel}</span>
-              {billLayout.showWaiter !== false && <span>Waiter: {(order.waiterCode || '')}</span>}
+              {billLayout.showWaiter !== false && <span>Waiter: {(order?.waiterCode || '')}</span>}
             </div>
 
             <hr style={{ border: 'none', borderTop: '1px dotted #000', margin: '4px 0' }} />
@@ -298,7 +328,7 @@ export default function BillingPage() {
 
             {billLayout.showCashier !== false && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
-                <span>Cashier : {pCashierName}</span><span>{pPaymentMode}</span>
+                <span>Cashier : {pCashierName}</span><span>E & C E</span>
               </div>
             )}
 
@@ -307,6 +337,11 @@ export default function BillingPage() {
             </div>
             {billLayout.footerLine2 && <div style={{ textAlign: 'center', fontWeight: 700 }}>{billLayout.footerLine2}</div>}
             {billLayout.footerLine3 && <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '2px' }}>{billLayout.footerLine3}</div>}
+            
+            {/* RestoGrow Branding */}
+            <div style={{ textAlign: 'center', fontSize: '8px', marginTop: '8px', color: '#999', fontStyle: 'italic' }}>
+              Powered by RestoGrow
+            </div>
           </div>
         </div>
 

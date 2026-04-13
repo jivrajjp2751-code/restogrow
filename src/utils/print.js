@@ -181,7 +181,6 @@ function buildBillHTML(bill) {
   const showCashier = layout.showCashier !== false;
   const cashierName = bill.cashierName || layout.cashierName || '';
   const waiterCode = bill.waiterCode || '';
-  const currency = bill.currency || '₹';
   
   // Tax breakdown — split GST into SGST & CGST
   const subtotal = bill.subtotal || 0;
@@ -436,6 +435,7 @@ ${showCashier ? `
   <div class="footer-bold">${footerLine1}</div>
   ${footerLine2 ? `<div class="footer-bold">${footerLine2}</div>` : ''}
   ${footerLine3 ? `<div style="margin-top:4px">${footerLine3}</div>` : ''}
+  <div style="margin-top:8px; font-size:8px; color:#999; font-style:italic">Powered by RestoGrow</div>
 </div>
 
 </body></html>`;

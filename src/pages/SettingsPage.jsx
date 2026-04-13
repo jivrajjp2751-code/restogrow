@@ -20,16 +20,12 @@ const DEFAULT_BILL_LAYOUT = {
 };
 
 export default function SettingsPage() {
-  const { config = {}, refresh, sections = [], currentUser } = useApp();
+  const { config = {}, refresh, sections = [] } = useApp();
   const { addToast } = useToast();
   const [form, setForm] = useState({ ...config });
   const [billLayout, setBillLayout] = useState({ ...DEFAULT_BILL_LAYOUT, ...(config.billLayout || {}) });
   const [isPrintStation, setIsPrintStation] = useState(localStorage.getItem('isPrintStation') === 'true');
-  const [editItemForm, setEditItemForm] = useState({
-    name: '', code: '', price: '', buyingPrice: '', stock: '', isTracked: true, section_ids: []
-  });
 
-  const isAdmin = currentUser?.role === 'admin';
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -279,6 +275,7 @@ export default function SettingsPage() {
               </div>
               {billLayout.footerLine2 && <div style={{ textAlign: 'center', fontWeight: 700 }}>{billLayout.footerLine2}</div>}
               {billLayout.footerLine3 && <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '2px' }}>{billLayout.footerLine3}</div>}
+              <div style={{ textAlign: 'center', fontSize: '8px', marginTop: '8px', color: '#999', fontStyle: 'italic' }}>Powered by RestoGrow</div>
             </div>
           </div>
         </div>

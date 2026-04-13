@@ -2,13 +2,10 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import {
   getOrderForTable, addItemToOrder, updateOrderItem, removeOrderItem,
-  createOrder, generateBill, cancelOrder, createPrintJob
+  createOrder, createPrintJob
 } from '../store/data';
-import { printSplitKOT, printBillDirect } from '../utils/print';
-import {
-  Search, Plus, Minus, Trash2, ArrowLeft, Printer, Wine, Coffee,
-  X, StickyNote, LogOut, Receipt, CreditCard, Banknote, Smartphone, RefreshCw, Package
-} from 'lucide-react';
+import { printSplitKOT } from '../utils/print';
+import { Search, ArrowLeft, Printer, LogOut, RefreshCw } from 'lucide-react';
 
 export default function StaffMobileDashboard() {
   const { tables = [], sections = [], menuItems = [], config = {}, refresh, currentSession, logout, refreshing = false } = useApp();
@@ -27,14 +24,9 @@ export default function StaffMobileDashboard() {
   }, [config, selectedTable]);
 
   const [activeDeptId, setActiveDeptId] = useState(depts[0]?.id);
-  useEffect(() => { if (!activeDeptId && depts.length > 0) setActiveDeptId(depts[0].id); }, [depts]);
-  const [noteModal, setNoteModal] = useState(null);
-  const [noteText, setNoteText] = useState('');
+  useEffect(() => { if (!activeDeptId && depts.length > 0) setActiveDeptId(depts[0].id); }, [depts, activeDeptId]);
   const [customerModal, setCustomerModal] = useState(null);
   const [customerName, setCustomerName] = useState('');
-  const [billModal, setBillModal] = useState(false);
-  const [paymentMode, setPaymentMode] = useState('Cash');
-  const [discount, setDiscount] = useState(0);
   const [order, setOrder] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -121,7 +113,6 @@ export default function StaffMobileDashboard() {
     setBusy(true);
     try {
       if (localStorage.getItem('isPrintStation') === 'true') {
-        const { printSplitKOT } = await import('../utils/print');
         printSplitKOT(order, selectedTable?.label || selectedTable?.number, null, config);
         addToast('Printing KOT...', 'success');
       } else {

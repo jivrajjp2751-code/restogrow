@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { getSplitReport, getMonthBills, getMostSoldLiquor, getSessionBills } from '../store/data';
-import { TrendingUp, Calendar, DollarSign, PieChart, Printer, Wine, Coffee, Award } from 'lucide-react';
+import { TrendingUp, DollarSign, PieChart, Printer, Award } from 'lucide-react';
 
 export default function ReportsPage() {
   const { config = {}, bills = [], sessions = [] } = useApp();

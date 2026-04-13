@@ -288,7 +288,7 @@ export async function addItemToOrder(orderId, item) {
   return dbInsert('order_items', payload);
 }
 
-export async function generateBill(orderId, paymentMode, discount) {
+export async function generateBill(orderId, discount) {
   // 1. Get Order & Items
   const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).single();
   if (orderErr) throw orderErr;
@@ -318,7 +318,7 @@ export async function generateBill(orderId, paymentMode, discount) {
     orderId: orderId,
     billNumber: billNumber,
     total,
-    paymentMode: paymentMode,
+    paymentMode: 'Unsettled',
     createdAt: new Date().toISOString()
   });
 
@@ -379,11 +379,23 @@ export async function generateBill(orderId, paymentMode, discount) {
   };
 }
 
+export async function settleBill(billId, paymentMode) {
+  if (!_restaurantId) throw new Error('No restaurant ID set.');
+  if (!billId || !paymentMode) throw new Error('Bill ID and Payment Mode are required.');
+  const { error } = await supabase
+    .from('bills')
+    .update({ paymentMode: paymentMode })
+    .eq('id', billId)
+    .eq('restaurant_id', _restaurantId);
+  if (error) throw error;
+  return { success: true };
+}
+
 export async function getOrderForTable(tableId) {
   if (!_restaurantId) return null;
   try {
     // Try snake_case first (standard)
-    let { data: orders, error } = await supabase.from('orders')
+    let { data: orders, error: _error } = await supabase.from('orders')
       .select('*')
       .eq('restaurant_id', _restaurantId)
       .eq('table_id', tableId)

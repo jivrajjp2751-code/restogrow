@@ -25,7 +25,7 @@ export default function UsersPage() {
   
   const handleDelete = async (id) => {
     if (id === currentUser?.id) { addToast("Can't delete yourself", 'error'); return; }
-    if (confirm('Delete?')) { try { await deleteUser(id); refresh(); } catch (e) { addToast('Failed', 'error'); } }
+    if (confirm('Delete?')) { try { await deleteUser(id); refresh(); } catch { addToast('Failed', 'error'); } }
   };
 
   return (

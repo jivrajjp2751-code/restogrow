@@ -5,7 +5,7 @@ import { markPrintJobDone } from '../store/data';
 import { printSplitKOT, printBillDirect } from '../utils/print';
 
 export default function PrintListener() {
-  const { config, currentSession, currentUser, categories } = useApp();
+  const { config, currentUser } = useApp();
   
   // This listener should only run if the device is designated as a print station
   // For now, we'll run it for all, but user can toggle it in settings or we can check role
@@ -64,7 +64,7 @@ export default function PrintListener() {
     const intervalId = setInterval(pollJobs, 4000);
 
     return () => clearInterval(intervalId);
-  }, [isPrintStation, currentUser, config, categories]);
+  }, [isPrintStation, currentUser, config]);
 
   return null; // Or a small status indicator
 }
