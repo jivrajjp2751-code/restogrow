@@ -235,46 +235,10 @@ export async function cancelOrder(orderId, tableId) {
 }
 
 export async function addItemToOrder(orderId, item) {
-  // 1. Get order's table and section surcharge
-  const { data: orderData, error: oErr } = await supabase.from('orders')
-    .select('tableId, table_id')
-    .eq('id', orderId)
-    .eq('restaurant_id', _restaurantId)
-    .single();
-    
-  if (oErr) {
-    console.warn("Could not find order for surcharge check, proceeding without it.", oErr);
-  }
-
-  const tableId = orderData?.tableId || orderData?.table_id;
-  let surcharge = 0;
   const itemDept = item.deptId || item.categoryType || 'bar';
   
-  if (tableId) {
-    const { data: table } = await supabase.from('tables')
-      .select('sectionId, section_id')
-      .eq('id', tableId)
-      .eq('restaurant_id', _restaurantId)
-      .single();
-      
-    const sectionId = table?.sectionId || table?.section_id;
-    if (sectionId) {
-      const { data: section } = await supabase.from('sections')
-        .select('surcharge, surchargeDepts, surcharge_depts')
-        .eq('id', sectionId)
-        .eq('restaurant_id', _restaurantId)
-        .single();
-        
-      if (section) {
-        const surchargeDepts = section.surchargeDepts || section.surcharge_depts || [];
-        const isApplicable = surchargeDepts.length === 0 || surchargeDepts.includes(itemDept);
-        surcharge = isApplicable ? (section.surcharge || 0) : 0;
-      }
-    }
-  }
-  
-  const surchargeFactor = 1 + (surcharge / 100);
-  const finalPrice = Math.round((item.price || 0) * surchargeFactor);
+  // Use the price explicitly provided (already includes surcharge from UI if applicable)
+  const finalPrice = item.price || 0;
 
   // Payload with ONLY standard camelCase columns to avoid "column not found" errors
   const payload = {
@@ -347,7 +311,7 @@ export async function generateBill(orderId, discount) {
   }
 
   await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId).eq('restaurant_id', _restaurantId);
-  await dbUpdate('tables', order.tableId, { status: 'available' }); // using dbUpdate inherently scopes to restaurant_id
+  await dbUpdate('tables', order.tableId, { status: 'billing' }); // changed from available to billing
 
   // Deduct stock
   for (const item of items) {
@@ -385,12 +349,23 @@ export async function generateBill(orderId, discount) {
 export async function settleBill(billId, paymentMode) {
   if (!_restaurantId) throw new Error('No restaurant ID set.');
   if (!billId || !paymentMode) throw new Error('Bill ID and Payment Mode are required.');
+
+  const { data: bill } = await supabase.from('bills').select('orderId').eq('id', billId).eq('restaurant_id', _restaurantId).single();
+
   const { error } = await supabase
     .from('bills')
     .update({ paymentMode: paymentMode })
     .eq('id', billId)
     .eq('restaurant_id', _restaurantId);
   if (error) throw error;
+
+  if (bill && bill.orderId) {
+     const { data: order } = await supabase.from('orders').select('tableId').eq('id', bill.orderId).eq('restaurant_id', _restaurantId).single();
+     if (order && order.tableId) {
+        await dbUpdate('tables', order.tableId, { status: 'available' });
+     }
+  }
+
   return { success: true };
 }
 

@@ -146,7 +146,9 @@ export default function InventoryPage() {
                 return selectedDeptTab === dept.id || (!selectedDeptTab && dept.id === 'kitchen');
               })
               .map(dept => {
-              const deptItems = searchFiltered.filter(i => i.deptId === dept.id || (!i.deptId && dept.id === 'bar'));
+              const deptItems = searchFiltered
+                .filter(i => i.deptId === dept.id || (!i.deptId && dept.id === 'bar'))
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
               return (
                 <div className="inventory-section" key={dept.id}>
                   <div className="section-header">

@@ -212,7 +212,7 @@ export default function OrderPage() {
               ? Math.round(item.price * (1 + tableSurcharge / 100))
               : item.price;
             return (
-              <div key={item.id} className="menu-item-card" onClick={() => handleAddItem(item)}>
+              <div key={item.id} className="menu-item-card" onClick={() => handleAddItem({...item, price: displayPrice})}>
                 <div className="menu-item-name">{item.name}</div>
                 <div className="menu-item-price">
                   {config.currency}{displayPrice}

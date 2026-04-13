@@ -2,12 +2,13 @@ import { useState, useCallback } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { createOrder, addTable, deleteTable, addSection, updateSection, deleteSection } from '../store/data';
-import { Plus, Edit3, Trash2, Settings, X } from 'lucide-react';
+import { Plus, Edit3, Trash2, Settings, X, CreditCard, Banknote, Smartphone, CheckCircle } from 'lucide-react';
 
 export default function TablesPage() {
-  const { tables = [], sections = [], config = {}, refresh, currentSession } = useApp();
+  const { tables = [], sections = [], config = {}, refresh, currentSession, bills = [], orders = [] } = useApp();
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState('all');
   const [customerModal, setCustomerModal] = useState(null);
   const [customerName, setCustomerName] = useState('');
@@ -17,6 +18,8 @@ export default function TablesPage() {
   const [newTableForm, setNewTableForm] = useState({ label: '', seats: 4 });
   const [sectionModal, setSectionModal] = useState(null);
   const [sectionForm, setSectionForm] = useState({ name: '', icon: '🏠', color: '#00B894', surcharge: 0, surchargeDepts: [] });
+  const [settleModal, setSettleModal] = useState(null);
+  const [settleMode, setSettleMode] = useState('Cash');
 
   const depts = config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}];
   const getTablesForSection = (sectionId) => tables.filter(t => t.sectionId === sectionId);
@@ -43,12 +46,24 @@ export default function TablesPage() {
     }
     if (table.status === 'available') {
       setCustomerModal(table);
-    } else if (table.status === 'occupied' || table.status === 'billing') {
+    } else if (table.status === 'occupied') {
       navigate(`/order/${table.id}`);
+    } else if (table.status === 'billing') {
+      // Find active bill for this table
+      const activeBill = bills.find(b => {
+         const o = orders.find(ord => ord.id === b.orderId);
+         return o && o.tableId === table.id && (!b.paymentMode || b.paymentMode === 'Unsettled');
+      });
+      if (activeBill) {
+        setSettleModal(activeBill);
+        setSettleMode('Cash');
+      } else {
+        addToast('No active bill found', 'error');
+      }
     } else if (table.status === 'reserved') {
       setCustomerModal(table);
     }
-  }, [navigate, editMode, currentSession, addToast]);
+  }, [navigate, editMode, currentSession, addToast, bills, orders]);
 
   const handleStartOrder = async () => {
     if (!customerModal) return;
@@ -62,6 +77,19 @@ export default function TablesPage() {
       setCustomerPhone('');
       navigate(`/order/${table.id}`);
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
+  };
+
+  const handleSettle = async () => {
+    if (!settleModal || busy) return;
+    setBusy(true);
+    try {
+      const { settleBill } = await import('../store/data');
+      await settleBill(settleModal.id, settleMode);
+      await refresh();
+      addToast(`Bill ${settleModal.billNumber} settled via ${settleMode}`, 'success');
+      setSettleModal(null);
+    } catch (e) { addToast('Settlement failed: ' + e.message, 'error'); }
+    finally { setBusy(false); }
   };
 
   const handleAddTable = async (sectionId) => {
@@ -339,6 +367,44 @@ export default function TablesPage() {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setAddTableModal(null)}>Cancel</button>
               <button className="btn btn-success" onClick={() => handleAddTable(addTableModal)}>ADD TABLE</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settlement Modal */}
+      {settleModal && (
+        <div className="modal-backdrop" onClick={() => setSettleModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '360px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">SETTLE — {settleModal.billNumber}</h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setSettleModal(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                Table: {settleModal.tableNumber} · Total: {config.currency}{settleModal.total}
+              </div>
+              <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)', marginBottom: '8px', marginTop: '12px', color: 'var(--text-secondary)' }}>PAYMENT METHOD</div>
+              <div className="payment-modes" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                {[
+                  { mode: 'Cash', icon: Banknote },
+                  { mode: 'Card', icon: CreditCard },
+                  { mode: 'UPI', icon: Smartphone },
+                ].map(p => (
+                  <button key={p.mode} type="button"
+                    className={`payment-mode-btn ${settleMode === p.mode ? 'active' : ''}`}
+                    onClick={() => setSettleMode(p.mode)}>
+                    <p.icon size={18} />
+                    <span>{p.mode}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setSettleModal(null)}>Cancel</button>
+              <button className="btn btn-success btn-lg" onClick={handleSettle} disabled={busy}>
+                <CheckCircle size={14} /> SETTLE — {settleMode}
+              </button>
             </div>
           </div>
         </div>

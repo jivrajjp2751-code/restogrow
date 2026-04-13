@@ -16,10 +16,6 @@ export default function BillingPage() {
   const [generatedBill, setGeneratedBill] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  // Settlement state
-  const [settlementMode, setSettlementMode] = useState('Cash');
-  const [settled, setSettled] = useState(false);
-
   if (!order && !generatedBill) {
     return (
       <div className="page-content"><div className="empty-state">
@@ -71,17 +67,6 @@ export default function BillingPage() {
     } catch (e) { addToast('Print failed: ' + e.message, 'error'); }
   };
 
-  const handleSettlement = async () => {
-    if (!generatedBill || busy) return;
-    setBusy(true);
-    try {
-      await settleBill(generatedBill.id, settlementMode);
-      setSettled(true);
-      refresh();
-      addToast(`Bill settled via ${settlementMode}`, 'success');
-    } catch (e) { addToast('Settlement failed: ' + e.message, 'error'); }
-    finally { setBusy(false); }
-  };
 
   const handleCancelOrder = async () => {
     if (!confirm('Cancel this order? All items will be removed.')) return;
@@ -133,36 +118,7 @@ export default function BillingPage() {
                  <button className="btn btn-success btn-lg" onClick={handlePrintBill}><Printer size={16} /> PRINT BILL</button>
                </div>
 
-               {/* Settlement Section */}
-               <div style={{ marginTop: '32px', padding: '24px', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                 {settled ? (
-                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--brand-success)', fontWeight: 700, fontSize: '14px' }}>
-                     <CheckCircle size={18} /> SETTLED VIA {settlementMode.toUpperCase()}
-                   </div>
-                 ) : (
-                   <>
-                     <div style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)', marginBottom: '12px', color: 'var(--text-secondary)' }}>SETTLEMENT</div>
-                     <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>Select how the customer paid. This is for reports only — not shown on the bill.</p>
-                     <div className="payment-modes" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-                       {[
-                         { mode: 'Cash', icon: Banknote },
-                         { mode: 'Card', icon: CreditCard },
-                         { mode: 'UPI', icon: Smartphone },
-                       ].map(p => (
-                         <button key={p.mode} type="button"
-                           className={`payment-mode-btn ${settlementMode === p.mode ? 'active' : ''}`}
-                           onClick={() => setSettlementMode(p.mode)}>
-                           <p.icon size={18} />
-                           <span>{p.mode}</span>
-                         </button>
-                       ))}
-                     </div>
-                     <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={handleSettlement} disabled={busy}>
-                       <CheckCircle size={16} /> SETTLE — {settlementMode.toUpperCase()}
-                     </button>
-                   </>
-                 )}
-               </div>
+
              </div>
           ) : (
              <>
