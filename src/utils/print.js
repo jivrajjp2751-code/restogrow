@@ -435,7 +435,7 @@ ${showCashier ? `
   <div class="footer-bold">${footerLine1}</div>
   ${footerLine2 ? `<div class="footer-bold">${footerLine2}</div>` : ''}
   ${footerLine3 ? `<div style="margin-top:4px">${footerLine3}</div>` : ''}
-  <div style="margin-top:8px; font-size:8px; color:#000; font-weight:bold; font-style:italic">Powered by RestoGrow</div>
+  <div style="margin-top:12px; font-size:11px; color:#000; font-weight:bold; font-style:italic">Powered by RestoGrow</div>
 </div>
 
 </body></html>`;

@@ -269,7 +269,7 @@ export default function SettingsPage() {
               </div>
               {billLayout.footerLine2 && <div style={{ textAlign: 'center', fontWeight: 700 }}>{billLayout.footerLine2}</div>}
               {billLayout.footerLine3 && <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '2px' }}>{billLayout.footerLine3}</div>}
-              <div style={{ textAlign: 'center', fontSize: '8px', marginTop: '8px', color: '#000', fontWeight: 'bold', fontStyle: 'italic' }}>Powered by RestoGrow</div>
+              <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '12px', color: '#000', fontWeight: 'bold', fontStyle: 'italic' }}>Powered by RestoGrow</div>
             </div>
           </div>
         </div>

@@ -339,7 +339,7 @@ export default function BillingPage() {
             {billLayout.footerLine3 && <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '2px' }}>{billLayout.footerLine3}</div>}
             
             {/* RestoGrow Branding */}
-            <div style={{ textAlign: 'center', fontSize: '8px', marginTop: '8px', color: '#000', fontWeight: 'bold', fontStyle: 'italic' }}>
+            <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '12px', color: '#000', fontWeight: 'bold', fontStyle: 'italic' }}>
               Powered by RestoGrow
             </div>
           </div>
