@@ -151,10 +151,10 @@ export default function InventoryPage() {
                 .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
               return (
                 <div className="inventory-section" key={dept.id}>
-                  <div className="section-header">
-                    <div className="section-title">
+                  <div className={`inventory-section-header ${dept.id}`}>
+                    <div className="inventory-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {dept.id === 'bar' ? <Wine size={14} /> : <Coffee size={14} />} {dept.name.toUpperCase()}
-                      <span className="badge badge-info" style={{ marginLeft: '8px' }}>{deptItems.length} items</span>
+                      <span className="badge badge-info" style={{ marginLeft: '4px' }}>{deptItems.length} items</span>
                     </div>
                     <button className="btn btn-primary btn-sm" onClick={() => openAddItem(dept.id)}>+ ADD ITEM</button>
                   </div>

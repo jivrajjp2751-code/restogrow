@@ -271,7 +271,12 @@ export default function OrderPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <button className="btn btn-secondary" onClick={handlePrintKOT}><Printer size={14}/> KOT</button>
-            <button className="btn btn-success" onClick={() => navigate(`/billing/${order.id}`)}>BILL</button>
+            <button className="btn btn-success" onClick={async () => {
+              setBusy(true);
+              try { await refresh(); } catch(e) {}
+              setBusy(false);
+              navigate(`/billing/${order.id}`);
+            }} disabled={busy}>BILL</button>
           </div>
         </div>
       </div>
