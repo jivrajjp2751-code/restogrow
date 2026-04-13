@@ -260,9 +260,21 @@ export default function TablesPage() {
                     </button>
                   )}
                   <div className="table-number">{table.label}</div>
-                  <div className="table-status-badge">
-                    {table.status === 'available' ? 'FREE' : table.status === 'occupied' ? 'BUSY' : (table.status || 'UNKNOWN').toUpperCase()}
-                  </div>
+                  {table.status === 'billing' ? (
+                    <div 
+                       style={{ fontSize: '10px', background: 'var(--brand-success)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontWeight: 800, marginTop: '2px', cursor: 'pointer', fontFamily: 'var(--font-mono)', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                       onClick={(e) => {
+                          e.stopPropagation();
+                          handleTableClick(table);
+                       }}
+                    >
+                      SETTLE
+                    </div>
+                  ) : (
+                    <div className="table-status-badge">
+                      {table.status === 'available' ? 'FREE' : table.status === 'occupied' ? 'BUSY' : (table.status || 'UNKNOWN').toUpperCase()}
+                    </div>
+                  )}
                 </div>
               ))}
               {sectionTables.length === 0 && (
