@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
 import {
@@ -15,6 +15,7 @@ export default function OrderPage() {
   const { addToast } = useToast();
 
   const table = useMemo(() => (tables || []).find(t => t.id === tableId), [tables, tableId]);
+  const isCancelling = React.useRef(false);
   const [order, setOrder] = useState(null);
   const depts = useMemo(() => {
     const allDepts = config.departments || [{id:'kitchen', name:'Kitchen'}, {id:'bar', name:'Bar'}];
@@ -43,7 +44,7 @@ export default function OrderPage() {
   const surchargeDepts = useMemo(() => sectionInfo?.surchargeDepts || [], [sectionInfo]);
 
   const loadOrder = useCallback(async () => {
-    if (!tableId) return;
+    if (!tableId || isCancelling.current) return;
     try {
       let existingOrder = await getOrderForTable(tableId);
       if (!existingOrder && table?.status === 'available') {
@@ -163,6 +164,7 @@ export default function OrderPage() {
   const handleCancelOrder = async () => {
     if (!order) return;
     if (!confirm('Cancel this order? All items will be removed.')) return;
+    isCancelling.current = true;
     setBusy(true);
     try {
       await cancelOrder(order.id, tableId);
@@ -231,9 +233,9 @@ export default function OrderPage() {
           <span>ORDER</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span className="badge badge-info">{safeItems.length}</span>
-            {safeItems.length > 0 && (
+            {order && (
               <button className="btn btn-sm btn-ghost" style={{ color: 'var(--brand-danger)', fontSize: '10px' }} onClick={handleCancelOrder}>
-                <XCircle size={12} /> CANCEL
+                <XCircle size={12} /> CANCEL ORDER
               </button>
             )}
           </div>

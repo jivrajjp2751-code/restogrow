@@ -179,13 +179,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '12px', paddingBottom: '12px', background: 'var(--brand-primary-light)', padding: '12px', borderRadius: '8px', border: '1px solid var(--brand-primary)', color: 'var(--brand-primary)' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700 }}>
-                <input type="checkbox" checked={isPrintStation} onChange={e => setIsPrintStation(e.target.checked)} style={{ width: '18px', height: '18px' }} />
-                Set this device as the Print Station
-              </label>
-              <p style={{ fontSize: '10px', marginTop: '4px', opacity: 0.8 }}>If checked, this computer will automatically print incoming wireless orders from mobile waiter devices.</p>
-            </div>
+
           </div>
 
           {/* LIVE PREVIEW */}
@@ -275,7 +269,7 @@ export default function SettingsPage() {
               </div>
               {billLayout.footerLine2 && <div style={{ textAlign: 'center', fontWeight: 700 }}>{billLayout.footerLine2}</div>}
               {billLayout.footerLine3 && <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '2px' }}>{billLayout.footerLine3}</div>}
-              <div style={{ textAlign: 'center', fontSize: '8px', marginTop: '8px', color: '#999', fontStyle: 'italic' }}>Powered by RestoGrow</div>
+              <div style={{ textAlign: 'center', fontSize: '8px', marginTop: '8px', color: '#000', fontWeight: 'bold', fontStyle: 'italic' }}>Powered by RestoGrow</div>
             </div>
           </div>
         </div>
