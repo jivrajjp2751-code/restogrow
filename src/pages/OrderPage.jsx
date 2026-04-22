@@ -273,7 +273,7 @@ export default function OrderPage() {
             <button className="btn btn-secondary" onClick={handlePrintKOT}><Printer size={14}/> KOT</button>
             <button className="btn btn-success" onClick={async () => {
               setBusy(true);
-              try { await refresh(); } catch(e) {}
+              try { await refresh(); } catch { /* ignore */ }
               setBusy(false);
               navigate(`/billing/${order.id}`);
             }} disabled={busy}>BILL</button>

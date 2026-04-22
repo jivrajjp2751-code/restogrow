@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, useToast } from '../context/AppContext';
-import { generateBill, createPrintJob, cancelOrder, settleBill } from '../store/data';
+import { generateBill, createPrintJob, cancelOrder } from '../store/data';
 import { CreditCard, Banknote, Smartphone, ArrowLeft, Printer, XCircle, CheckCircle } from 'lucide-react';
 import { printBillDirect } from '../utils/print';
 

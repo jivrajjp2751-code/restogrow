@@ -53,14 +53,18 @@ export function AppProvider({ children }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.split('?')[1]);
     const rid = params.get('rid');
-    if (rid) {
+    
+    if (currentUser?.restaurant_id) {
+      // Security enforcement: Authenticated user is strictly bound to their own tenant
+      setTenant(currentUser.restaurant_id);
+    } else if (rid) {
       localStorage.setItem('rg_tenant_id', rid);
       setTenantId(rid);
       setTenant(rid);
     } else if (tenantId) {
       setTenant(tenantId);
     }
-  }, [tenantId]);
+  }, [tenantId, currentUser]);
 
   const loadData = useCallback(async () => {
     if (!getTenant()) {

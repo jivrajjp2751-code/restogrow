@@ -9,8 +9,17 @@ export default function MasterPortal() {
   const [stats, setStats] = useState({ total: 0, active: 0 });
   const [dbError, setDbError] = useState('');
 
+  const [authorized, setAuthorized] = useState(false);
+
   useEffect(() => {
-    fetchData();
+    // Basic frontend authorization gate to prevent accidental leakage to unauth visitors
+    const key = prompt("Enter Master Fleet Access Key:");
+    if (key === "MFL@fleet2026") {
+      setAuthorized(true);
+      fetchData();
+    } else {
+      window.location.hash = "/";
+    }
   }, []);
 
   async function fetchData() {
@@ -92,6 +101,10 @@ export default function MasterPortal() {
       alert('Error deleting: ' + e.message);
     }
   };
+
+  if (!authorized) {
+    return <div style={{ height: '100vh', background: '#F8F9FC' }} />;
+  }
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#F8F9FC', overflowY: 'auto', padding: '32px' }}>
