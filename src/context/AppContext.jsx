@@ -118,7 +118,8 @@ export function AppProvider({ children }) {
 
   const refresh = useCallback(async () => { await loadData(); }, [loadData]);
 
-  const currentSession = (data.sessions || []).find(s => s.status === 'active') || null;
+  const activeSessions = (data.sessions || []).filter(s => s.status === 'active');
+  const currentSession = activeSessions.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0] || null;
 
   return (
     <AppContext.Provider value={{

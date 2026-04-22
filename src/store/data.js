@@ -278,14 +278,29 @@ export async function generateBill(orderId, discount) {
 
   const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
+
+  // Find active session to bind the bill explicitly
+  let sessionId = null;
+  const { data: activeSessions } = await supabase
+    .from('sessions')
+    .select('id')
+    .eq('restaurant_id', _restaurantId)
+    .eq('status', 'active')
+    .order('startedAt', { ascending: false })
+    .limit(1);
+
+  if (activeSessions && activeSessions.length > 0) {
+    sessionId = activeSessions[0].id;
+  }
   
-  // Use camelCase
+  
   const bill = await dbInsert('bills', {
     id: billId,
     orderId: orderId,
     billNumber: billNumber,
     total,
     paymentMode: 'Unsettled',
+    sessionId: sessionId,
     createdAt: new Date().toISOString()
   });
 
@@ -482,6 +497,13 @@ export async function addStock(menuItemId, qty, reason) {
 }
 
 export async function startSession(startedBy) {
+  // Ensure no other active sessions exist (auto-close them)
+  await supabase
+    .from('sessions')
+    .update({ status: 'ended', endedAt: new Date().toISOString(), endedBy: 'Auto-closed' })
+    .eq('status', 'active')
+    .eq('restaurant_id', _restaurantId);
+
   return dbInsert('sessions', {
     date: new Date().toLocaleDateString(),
     startedAt: new Date().toISOString(),
