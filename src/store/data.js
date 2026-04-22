@@ -294,15 +294,33 @@ export async function generateBill(orderId, discount) {
   }
   
   
-  const bill = await dbInsert('bills', {
+  const baseBillPayload = {
     id: billId,
     orderId: orderId,
     billNumber: billNumber,
     total,
     paymentMode: 'Unsettled',
-    sessionId: sessionId,
     createdAt: new Date().toISOString()
-  });
+  };
+
+  let bill;
+  try {
+    // 1. Try with camelCase (as originally intended)
+    bill = await dbInsert('bills', { ...baseBillPayload, sessionId: sessionId });
+  } catch (err1) {
+    if (err1.message && err1.message.includes('sessionId')) {
+      try {
+        // 2. Try with snake_case (standard Supabase format)
+        bill = await dbInsert('bills', { ...baseBillPayload, session_id: sessionId });
+      } catch (err2) {
+        console.warn("⚠️ Both sessionId and session_id columns missing in 'bills' table. Proceeding without linking session.", err2);
+        // 3. Fallback: insert without session ID so billing doesn't crash
+        bill = await dbInsert('bills', baseBillPayload);
+      }
+    } else {
+      throw err1; // Throw if it's an unrelated error
+    }
+  }
 
   // Fetch buying prices for items to log profit accurately
   const { data: menuItemsData } = await supabase.from('menu_items').select('id, buyingPrice').eq('restaurant_id', _restaurantId);
