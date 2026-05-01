@@ -66,17 +66,31 @@ export async function syncAll() {
       if (!res.data) return;
 
       // NORMALIZE ALL DATA IN SYNCALL
+      // PostgreSQL folds unquoted identifiers to lowercase, so we must check
+      // camelCase (orderId), snake_case (order_id), AND lowercase (orderid)
       const normalizedData = res.data.map(row => ({
         ...row,
-        tableId: row.tableId || row.table_id || row.table_no,
-        orderId: row.orderId || row.order_id,
-        menuItemId: row.menuItemId || row.menu_item_id,
-        categoryType: row.categoryType || row.category_type,
-        sessionId: row.sessionId || row.session_id,
-        createdAt: row.createdAt || row.created_at,
-        billNumber: row.billNumber || row.bill_number,
-        paymentMode: row.paymentMode || row.payment_mode,
-        billId: row.billId || row.bill_id
+        tableId: row.tableId || row.table_id || row.table_no || row.tableid,
+        tableLabel: row.tableLabel || row.table_label || row.tablelabel,
+        tableNumber: row.tableNumber || row.table_number || row.tablenumber,
+        orderId: row.orderId || row.order_id || row.orderid,
+        menuItemId: row.menuItemId || row.menu_item_id || row.menuitemid,
+        categoryType: row.categoryType || row.category_type || row.categorytype,
+        sessionId: row.sessionId || row.session_id || row.sessionid,
+        createdAt: row.createdAt || row.created_at || row.createdat,
+        billNumber: row.billNumber || row.bill_number || row.billnumber,
+        paymentMode: row.paymentMode || row.payment_mode || row.paymentmode,
+        billId: row.billId || row.bill_id || row.billid,
+        buyingPrice: row.buyingPrice || row.buying_price || row.buyingprice || 0,
+        deptId: row.deptId || row.dept_id || row.deptid,
+        startedAt: row.startedAt || row.started_at || row.startedat,
+        endedAt: row.endedAt || row.ended_at || row.endedat,
+        startedBy: row.startedBy || row.started_by || row.startedby,
+        endedBy: row.endedBy || row.ended_by || row.endedby,
+        sectionId: row.sectionId || row.section_id || row.sectionid,
+        quantity: row.quantity || row.qty || 0,
+        price: row.price || 0,
+        name: row.name || '',
       }));
 
       if (tableName === 'config') {
@@ -93,19 +107,26 @@ export async function syncAll() {
     // Post-process items into Maps
     const orderItemsMap = {};
     (results.order_items || []).forEach(item => {
-      if (!orderItemsMap[item.orderId]) orderItemsMap[item.orderId] = [];
-      orderItemsMap[item.orderId].push(item);
+      // Use the normalized orderId (which now covers camelCase, snake_case, and lowercase)
+      const key = item.orderId;
+      if (!key) return; // skip items with no order reference
+      if (!orderItemsMap[key]) orderItemsMap[key] = [];
+      orderItemsMap[key].push(item);
     });
 
     const billItemsMap = {};
     (results.bill_items || []).forEach(item => {
       item.quantity = item.quantity || item.qty || 0;
-      if (!billItemsMap[item.billId]) billItemsMap[item.billId] = [];
-      billItemsMap[item.billId].push(item);
+      const key = item.billId;
+      if (!key) return; // skip items with no bill reference
+      if (!billItemsMap[key]) billItemsMap[key] = [];
+      billItemsMap[key].push(item);
     });
 
     (results.orders || []).forEach(o => {
       o.items = orderItemsMap[o.id] || [];
+      // Also set tableNumber from tableLabel for bill preview compatibility
+      o.tableNumber = o.tableNumber || o.tableLabel || o.tableLabel || '';
     });
     
     (results.bills || []).forEach(b => {
@@ -203,15 +224,36 @@ export async function deleteMenuItem(id) { return dbDelete('menu_items', id); }
 
 export async function createOrder(tableId, tableLabel, customerName, createdBy) {
   const orderId = getUUID();
-  const orderData = { 
+  const camelData = { 
     id: orderId,
     tableId: tableId, 
     tableLabel, 
     status: 'active', 
     createdBy,
   };
-  const order = await dbInsert('orders', orderData);
-  await dbUpdate('tables', tableId, { status: 'occupied' });
+  
+  let order;
+  try {
+    order = await dbInsert('orders', camelData);
+  } catch (err1) {
+    const snakeData = {
+      id: orderId,
+      table_id: tableId,
+      table_label: tableLabel,
+      status: 'active',
+      created_by: createdBy
+    };
+    try {
+      order = await dbInsert('orders', snakeData);
+    } catch (err2) {
+      throw new Error('Failed to create order: ' + err2.message);
+    }
+  }
+
+  try {
+    await dbUpdate('tables', tableId, { status: 'occupied' });
+  } catch { /* non-critical */ }
+  
   return order;
 }
 
@@ -236,15 +278,13 @@ export async function cancelOrder(orderId, tableId) {
 }
 
 export async function addItemToOrder(orderId, item) {
-  const itemDept = item.deptId || item.categoryType || 'bar';
-  
-  // Use the price explicitly provided (already includes surcharge from UI if applicable)
+  const itemDept = item.deptId || item.categoryType || item.category_type || 'bar';
   const finalPrice = item.price || 0;
+  const mId = item.id || item.menuItemId || item.menu_item_id;
 
-  // Payload with ONLY standard camelCase columns to avoid "column not found" errors
-  const payload = {
+  const camelPayload = {
     orderId: orderId,
-    menuItemId: item.id || item.menuItemId,
+    menuItemId: mId,
     name: item.name,
     price: finalPrice,
     quantity: item.quantity || 1,
@@ -252,8 +292,27 @@ export async function addItemToOrder(orderId, item) {
     note: item.note || '',
     restaurant_id: _restaurantId
   };
-  
-  return dbInsert('order_items', payload);
+
+  try {
+    return await dbInsert('order_items', camelPayload);
+  } catch (err1) {
+    // Fallback to snake_case payload
+    const snakePayload = {
+      order_id: orderId,
+      menu_item_id: mId,
+      name: item.name,
+      price: finalPrice,
+      quantity: item.quantity || 1,
+      category_type: itemDept,
+      note: item.note || '',
+      restaurant_id: _restaurantId
+    };
+    try {
+      return await dbInsert('order_items', snakePayload);
+    } catch (err2) {
+      throw new Error('Failed to add item to order: ' + err2.message);
+    }
+  }
 }
 
 export async function generateBill(orderId, discount) {
