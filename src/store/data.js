@@ -75,7 +75,8 @@ export async function syncAll() {
         sessionId: row.sessionId || row.session_id,
         createdAt: row.createdAt || row.created_at,
         billNumber: row.billNumber || row.bill_number,
-        paymentMode: row.paymentMode || row.payment_mode
+        paymentMode: row.paymentMode || row.payment_mode,
+        billId: row.billId || row.bill_id
       }));
 
       if (tableName === 'config') {
@@ -260,9 +261,13 @@ export async function generateBill(orderId, discount) {
   const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).eq('restaurant_id', _restaurantId).single();
   if (orderErr) throw orderErr;
   
-  // orderId is the actual column name in the DB
-  const { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('orderId', orderId).eq('restaurant_id', _restaurantId);
-  if (itemsErr) throw itemsErr;
+  let { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('order_id', orderId).eq('restaurant_id', _restaurantId);
+  if (!items || items.length === 0) {
+    const res = await supabase.from('order_items').select('*').eq('orderId', orderId).eq('restaurant_id', _restaurantId);
+    items = res.data || [];
+    if (res.error) itemsErr = res.error;
+  }
+  if (itemsErr && !items.length) throw itemsErr;
 
   const { data: configData } = await supabase.from('config').select('*').eq('restaurant_id', _restaurantId);
   const cfg = { taxRate: 0, serviceChargeRate: 0, restaurantName: 'RestoGrow', currency: '₹' };
@@ -339,8 +344,34 @@ export async function generateBill(orderId, discount) {
   }));
   
   if (billItems.length > 0) {
-    const { error: biErr } = await supabase.from('bill_items').insert(billItems);
-    if (biErr) throw new Error(`bill_items insert failed: ${biErr.message}`);
+    const { error: biErr1 } = await supabase.from('bill_items').insert(billItems);
+    if (biErr1) {
+      // Fallback to snake_case column names
+      const snakeCaseItems = items.map(item => ({
+        bill_id: billId,
+        name: item.name,
+        price: item.price,
+        buying_price: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
+        quantity: item.quantity || item.qty || 0,
+        category_type: item.deptId || item.categoryType || item.category_type || 'bar',
+        restaurant_id: _restaurantId
+      }));
+      const { error: biErr2 } = await supabase.from('bill_items').insert(snakeCaseItems);
+      if (biErr2) {
+        console.warn('Both camelCase and snakeCase inserts failed for bill_items. Trying mixed case...', biErr1, biErr2);
+        const mixedItems = items.map(item => ({
+          bill_id: billId,
+          name: item.name,
+          price: item.price,
+          buyingPrice: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
+          quantity: item.quantity || item.qty || 0,
+          categoryType: item.deptId || item.categoryType || item.category_type || 'bar',
+          restaurant_id: _restaurantId
+        }));
+        const { error: biErr3 } = await supabase.from('bill_items').insert(mixedItems);
+        if (biErr3) throw new Error(`bill_items insert failed: ${biErr3.message}`);
+      }
+    }
   }
 
   await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId).eq('restaurant_id', _restaurantId);
