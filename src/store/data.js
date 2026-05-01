@@ -36,6 +36,24 @@ export async function authenticateUser(email, password) {
 }
 
 // ===== MULTI-TENANT DATA SYNC =====
+
+// Helper to fetch all rows overcoming Supabase's 1000 row limit
+async function fetchAll(table) {
+  let allData = [];
+  let from = 0;
+  let to = 999;
+  while (true) {
+    const { data, error } = await supabase.from(table).select('*').eq('restaurant_id', _restaurantId).range(from, to);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < 1000) break;
+    from += 1000;
+    to += 1000;
+  }
+  return { data: allData };
+}
+
 export async function syncAll() {
   if (!_restaurantId) return null;
   
@@ -43,9 +61,7 @@ export async function syncAll() {
   const results = {};
 
   try {
-    const fetchPromises = tableNames.map(table => 
-      supabase.from(table).select('*').eq('restaurant_id', _restaurantId)
-    );
+    const fetchPromises = tableNames.map(table => fetchAll(table));
     
     // Also fetch restaurant status
     const restPromise = supabase.from('restaurants').select('status, name').eq('id', _restaurantId).single();
@@ -58,10 +74,6 @@ export async function syncAll() {
 
     responses.forEach((res, index) => {
       const tableName = tableNames[index];
-      if (res.error) {
-        console.error(`Error fetching ${tableName}:`, res.error);
-        return;
-      }
       
       if (!res.data) return;
 
@@ -369,7 +381,7 @@ export async function generateBill(orderId, discount) {
   // 3. Last resort: fetch ALL order_items for this restaurant and filter client-side
   if (items.length === 0) {
     try {
-      const res3 = await supabase.from('order_items').select('*').eq('restaurant_id', _restaurantId);
+      const res3 = await fetchAll('order_items');
       if (res3.data) {
         items = res3.data.filter(i =>
           i.orderId === orderId || i.order_id === orderId ||
@@ -597,7 +609,7 @@ export async function getOrderForTable(tableId) {
     // Last resort fallback (handles 'orderid' lowercase etc.)
     if (!items || items.length === 0) {
       try {
-        const res3 = await supabase.from('order_items').select('*').eq('restaurant_id', _restaurantId);
+        const res3 = await fetchAll('order_items');
         if (res3.data) {
           items = res3.data.filter(i => 
             i.orderId === order.id || i.order_id === order.id || 
