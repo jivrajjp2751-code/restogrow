@@ -69,10 +69,11 @@ export default function BillingPage() {
 
 
   const handleCancelOrder = async () => {
+    if (!order) { addToast('Order not found', 'error'); return; }
     if (!confirm('Cancel this order? All items will be removed.')) return;
     setBusy(true);
     try {
-      await cancelOrder(order.id, order.tableId);
+      await cancelOrder(order.id, order.tableId || order.table_id);
       await refresh();
       addToast('Order cancelled', 'info');
       navigate('/tables');
@@ -82,6 +83,8 @@ export default function BillingPage() {
 
   // Preview Data (either live or from DB)
   const isGenerated = !!generatedBill;
+  const safeOrderItems = order?.items || [];
+  const safeOrderTableLabel = order?.tableNumber || order?.tableLabel || order?.table_label || '';
   const dRestaurantName = isGenerated ? generatedBill.restaurantName : (billLayout.restaurantName || config.restaurantName || 'RESTAURANT');
   const dAddress = isGenerated ? generatedBill.restaurantAddress : (billLayout.address || config.address || '');
   const dPhone = isGenerated ? generatedBill.restaurantPhone : (billLayout.phone || config.phone || '');
@@ -95,8 +98,8 @@ export default function BillingPage() {
   const pDiscountAmount = isGenerated ? (generatedBill.discountAmount || 0) : discountAmount;
   const pDiscountPercent = isGenerated ? generatedBill.discount : discount;
   const pTotal = isGenerated ? (generatedBill.total || 0) : total;
-  const pItems = isGenerated ? generatedBill.items : order.items;
-  const pTableLabel = isGenerated ? generatedBill.tableNumber : order.tableNumber;
+  const pItems = isGenerated ? (generatedBill.items || []) : safeOrderItems;
+  const pTableLabel = isGenerated ? generatedBill.tableNumber : safeOrderTableLabel;
   const pBillNumber = isGenerated ? generatedBill.billNumber : 'DRAFT';
   const pDate = isGenerated ? new Date(generatedBill.createdAt || Date.now()).toLocaleString('en-IN') : new Date().toLocaleString('en-IN');
   const pCashierName = isGenerated ? generatedBill.cashierName : (currentUser?.name || 'CN');

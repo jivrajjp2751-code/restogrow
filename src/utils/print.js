@@ -6,8 +6,11 @@
  * Print a bill receipt
  */
 export function printBillDirect(bill) {
-  const html = buildBillHTML(bill);
-  silentPrint(html);
+  if (!bill) { console.error('printBillDirect: No bill data'); return; }
+  try {
+    const html = buildBillHTML(bill);
+    silentPrint(html);
+  } catch (e) { console.error('Print failed:', e); }
 }
 
 /**
@@ -15,24 +18,24 @@ export function printBillDirect(bill) {
  * Items matched by categoryType/deptId to department ID
  */
 export function printSplitKOT(order, tableNumber, _unused, config = {}) {
+  if (!order) { console.error('printSplitKOT: No order data'); return { success: false }; }
   const departments = config.departments || [{id: 'kitchen', name: 'Kitchen'}, {id: 'bar', name: 'Bar'}];
   
   let printedCount = 0;
   
   departments.forEach((dept) => {
-    // Match items by dept: categoryType or deptId matches dept.id
-    const deptItems = (order?.items || []).filter(i =>
-      i.categoryType === dept.id || i.deptId === dept.id
-    );
-    
-    if (deptItems.length > 0) {
-      const deptOrder = { ...order, items: deptItems };
-      const html = buildDeptKOTHTML(deptOrder, tableNumber, dept);
+    try {
+      const deptItems = (order?.items || []).filter(i =>
+        i.categoryType === dept.id || i.deptId === dept.id
+      );
       
-      // Delay prints slightly to prevent browser dropping them
-      setTimeout(() => silentPrint(html), printedCount * 1500);
-      printedCount++;
-    }
+      if (deptItems.length > 0) {
+        const deptOrder = { ...order, items: deptItems };
+        const html = buildDeptKOTHTML(deptOrder, tableNumber, dept);
+        setTimeout(() => silentPrint(html), printedCount * 1500);
+        printedCount++;
+      }
+    } catch (e) { console.error('KOT print error for dept:', dept.name, e); }
   });
   
   return { success: printedCount > 0 };

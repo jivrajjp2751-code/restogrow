@@ -1,9 +1,34 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, Component } from 'react';
 import { AppProvider, ToastProvider, useApp } from './context/AppContext';
 import Sidebar from './components/Sidebar';
 import PrintListener from './components/PrintListener';
 import './index.css';
+
+// Global Error Boundary — catches any uncaught React rendering errors
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error('⚠️ App Error Boundary:', error, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#1A1B2E', color: 'white', padding: '20px', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '12px' }}>Something went wrong</h2>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '24px', maxWidth: '400px' }}>
+            {this.state.error?.message || 'An unexpected error occurred.'}
+          </p>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', borderRadius: '8px', background: '#6C5CE7', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}>RELOAD APP</button>
+            <button onClick={() => this.setState({ hasError: false, error: null })} style={{ padding: '12px 24px', borderRadius: '8px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 700, cursor: 'pointer' }}>TRY AGAIN</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Lazy load pages for performance optimization on low-end PCs
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -100,18 +125,20 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <HashRouter>
-      <ToastProvider>
-        <AppProvider>
-          <PrintListener />
-          <Suspense fallback={<LoadingFallback />}>
-            <Routes>
-              <Route path="/jivesh" element={<MasterPortal />} />
-              <Route path="*" element={<ProtectedLayout />} />
-            </Routes>
-          </Suspense>
-        </AppProvider>
-      </ToastProvider>
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <ToastProvider>
+          <AppProvider>
+            <PrintListener />
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
+                <Route path="/jivesh" element={<MasterPortal />} />
+                <Route path="*" element={<ProtectedLayout />} />
+              </Routes>
+            </Suspense>
+          </AppProvider>
+        </ToastProvider>
+      </HashRouter>
+    </ErrorBoundary>
   );
 }

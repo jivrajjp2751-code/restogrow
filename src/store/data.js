@@ -257,25 +257,70 @@ export async function addItemToOrder(orderId, item) {
 }
 
 export async function generateBill(orderId, discount) {
-  // 1. Get Order & Items
+  if (!_restaurantId) throw new Error('No restaurant ID set. Please reload the page.');
+  if (!orderId) throw new Error('No order ID provided.');
+
+  // 1. Get Order
   const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).eq('restaurant_id', _restaurantId).single();
-  if (orderErr) throw orderErr;
-  
-  let { data: items, error: itemsErr } = await supabase.from('order_items').select('*').eq('order_id', orderId).eq('restaurant_id', _restaurantId);
-  if (!items || items.length === 0) {
-    const res = await supabase.from('order_items').select('*').eq('orderId', orderId).eq('restaurant_id', _restaurantId);
-    items = res.data || [];
-    if (res.error) itemsErr = res.error;
+  if (orderErr || !order) throw new Error('Order not found: ' + (orderErr?.message || 'unknown'));
+
+  // Normalize order fields
+  const orderTableId = order.tableId || order.table_id;
+  const orderTableLabel = order.tableLabel || order.table_label || order.tableNumber || order.table_number || '';
+
+  // 2. Fetch order items — try BOTH column names safely with try/catch
+  let items = [];
+  try {
+    const res1 = await supabase.from('order_items').select('*').eq('orderId', orderId).eq('restaurant_id', _restaurantId);
+    if (res1.data && res1.data.length > 0) items = res1.data;
+  } catch (e) { console.warn('orderId query failed:', e.message); }
+
+  if (items.length === 0) {
+    try {
+      const res2 = await supabase.from('order_items').select('*').eq('order_id', orderId).eq('restaurant_id', _restaurantId);
+      if (res2.data && res2.data.length > 0) items = res2.data;
+    } catch (e) { console.warn('order_id query failed:', e.message); }
   }
-  if (itemsErr && !items.length) throw itemsErr;
 
-  const { data: configData } = await supabase.from('config').select('*').eq('restaurant_id', _restaurantId);
+  // 3. Last resort: fetch ALL order_items for this restaurant and filter client-side
+  if (items.length === 0) {
+    try {
+      const res3 = await supabase.from('order_items').select('*').eq('restaurant_id', _restaurantId);
+      if (res3.data) {
+        items = res3.data.filter(i =>
+          i.orderId === orderId || i.order_id === orderId ||
+          i.orderid === orderId || i.OrderId === orderId
+        );
+      }
+    } catch (e) { console.warn('Fallback order_items query failed:', e.message); }
+  }
+
+  if (items.length === 0) {
+    console.error('⚠️ generateBill: No items found for order', orderId);
+    throw new Error('No items found for this order. Please add items before generating a bill.');
+  }
+
+  // Normalize item fields
+  items = items.map(i => ({
+    ...i,
+    quantity: i.quantity || i.qty || 1,
+    price: i.price || 0,
+    name: i.name || 'Unknown Item',
+    menuItemId: i.menuItemId || i.menu_item_id,
+    categoryType: i.categoryType || i.category_type || i.deptId || 'bar',
+  }));
+
+  // 4. Load config
   const cfg = { taxRate: 0, serviceChargeRate: 0, restaurantName: 'RestoGrow', currency: '₹' };
-  configData?.forEach(r => { 
-    try { cfg[r.id] = JSON.parse(r.value); } catch { cfg[r.id] = r.value; }
-  });
+  try {
+    const { data: configData } = await supabase.from('config').select('*').eq('restaurant_id', _restaurantId);
+    (configData || []).forEach(r => {
+      try { cfg[r.id] = JSON.parse(r.value); } catch { cfg[r.id] = r.value; }
+    });
+  } catch (e) { console.warn('Config fetch failed, using defaults:', e.message); }
 
-  const subtotal = items.reduce((s, i) => s + ((i.price||0) * (i.quantity||i.qty||0)), 0);
+  // 5. Calculate totals
+  const subtotal = items.reduce((s, i) => s + (i.price * i.quantity), 0);
   const taxAmount = (subtotal * (cfg.taxRate || 0)) / 100;
   const serviceCharge = (subtotal * (cfg.serviceChargeRate || 0)) / 100;
   const discountAmount = (subtotal * (discount || 0)) / 100;
@@ -284,129 +329,111 @@ export async function generateBill(orderId, discount) {
   const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
 
-  // Find active session to bind the bill explicitly
+  // 6. Find active session
   let sessionId = null;
-  const { data: activeSessions } = await supabase
-    .from('sessions')
-    .select('id')
-    .eq('restaurant_id', _restaurantId)
-    .eq('status', 'active')
-    .order('startedAt', { ascending: false })
-    .limit(1);
+  try {
+    const { data: activeSessions } = await supabase
+      .from('sessions').select('id')
+      .eq('restaurant_id', _restaurantId).eq('status', 'active')
+      .order('startedAt', { ascending: false }).limit(1);
+    if (activeSessions && activeSessions.length > 0) sessionId = activeSessions[0].id;
+  } catch { /* non-critical */ }
 
-  if (activeSessions && activeSessions.length > 0) {
-    sessionId = activeSessions[0].id;
-  }
-  
-  
+  // 7. Insert bill record with fallback strategies
   const baseBillPayload = {
-    id: billId,
-    orderId: orderId,
-    billNumber: billNumber,
-    total,
-    paymentMode: 'Unsettled',
-    createdAt: new Date().toISOString()
+    id: billId, orderId, billNumber, total,
+    subtotal, discount: discount || 0, discountAmount,
+    taxRate: cfg.taxRate, taxAmount, serviceCharge,
+    paymentMode: 'Unsettled', createdAt: new Date().toISOString(),
+    tableNumber: orderTableLabel,
   };
 
   let bill;
   try {
-    // 1. Try with camelCase (as originally intended)
-    bill = await dbInsert('bills', { ...baseBillPayload, sessionId: sessionId });
+    bill = await dbInsert('bills', { ...baseBillPayload, sessionId });
   } catch (err1) {
-    if (err1.message && err1.message.includes('sessionId')) {
+    try {
+      bill = await dbInsert('bills', { ...baseBillPayload, session_id: sessionId });
+    } catch (err2) {
       try {
-        // 2. Try with snake_case (standard Supabase format)
-        bill = await dbInsert('bills', { ...baseBillPayload, session_id: sessionId });
-      } catch (err2) {
-        console.warn("⚠️ Both sessionId and session_id columns missing in 'bills' table. Proceeding without linking session.", err2);
-        // 3. Fallback: insert without session ID so billing doesn't crash
         bill = await dbInsert('bills', baseBillPayload);
+      } catch (err3) {
+        throw new Error('Bill creation failed: ' + err3.message);
       }
-    } else {
-      throw err1; // Throw if it's an unrelated error
     }
   }
 
-  // Fetch buying prices for items to log profit accurately
-  const { data: menuItemsData } = await supabase.from('menu_items').select('id, buyingPrice').eq('restaurant_id', _restaurantId);
+  // 8. Fetch buying prices for profit tracking
   const buyingPriceMap = {};
-  menuItemsData?.forEach(m => { buyingPriceMap[m.id] = m.buyingPrice || 0; });
+  try {
+    const { data: menuItemsData } = await supabase.from('menu_items').select('id, buyingPrice').eq('restaurant_id', _restaurantId);
+    (menuItemsData || []).forEach(m => { buyingPriceMap[m.id] = m.buyingPrice || 0; });
+  } catch { /* non-critical */ }
 
-  // Use camelCase for bill items
-  const billItems = items.map(item => ({
-    billId: billId,
-    name: item.name,
-    price: item.price,
-    buyingPrice: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
-    quantity: item.quantity || item.qty || 0,
-    categoryType: item.deptId || item.categoryType || item.category_type || 'bar',
+  // 9. Insert bill_items with fallback
+  const billItemPayloads = items.map(item => ({
+    billId, name: item.name, price: item.price,
+    buyingPrice: buyingPriceMap[item.menuItemId] || 0,
+    quantity: item.quantity,
+    categoryType: item.categoryType,
     restaurant_id: _restaurantId
   }));
-  
-  if (billItems.length > 0) {
-    const { error: biErr1 } = await supabase.from('bill_items').insert(billItems);
-    if (biErr1) {
-      // Fallback to snake_case column names
-      const snakeCaseItems = items.map(item => ({
-        bill_id: billId,
-        name: item.name,
-        price: item.price,
-        buying_price: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
-        quantity: item.quantity || item.qty || 0,
-        category_type: item.deptId || item.categoryType || item.category_type || 'bar',
-        restaurant_id: _restaurantId
-      }));
-      const { error: biErr2 } = await supabase.from('bill_items').insert(snakeCaseItems);
-      if (biErr2) {
-        console.warn('Both camelCase and snakeCase inserts failed for bill_items. Trying mixed case...', biErr1, biErr2);
-        const mixedItems = items.map(item => ({
-          bill_id: billId,
-          name: item.name,
-          price: item.price,
-          buyingPrice: buyingPriceMap[item.menuItemId || item.menu_item_id] || 0,
-          quantity: item.quantity || item.qty || 0,
-          categoryType: item.deptId || item.categoryType || item.category_type || 'bar',
+
+  if (billItemPayloads.length > 0) {
+    try {
+      const { error: biErr } = await supabase.from('bill_items').insert(billItemPayloads);
+      if (biErr) {
+        // Fallback: snake_case
+        const snake = items.map(item => ({
+          bill_id: billId, name: item.name, price: item.price,
+          buying_price: buyingPriceMap[item.menuItemId] || 0,
+          quantity: item.quantity,
+          category_type: item.categoryType,
           restaurant_id: _restaurantId
         }));
-        const { error: biErr3 } = await supabase.from('bill_items').insert(mixedItems);
-        if (biErr3) throw new Error(`bill_items insert failed: ${biErr3.message}`);
+        await supabase.from('bill_items').insert(snake);
       }
-    }
+    } catch (e) { console.warn('bill_items insert failed (non-critical):', e.message); }
   }
 
-  await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId).eq('restaurant_id', _restaurantId);
-  await dbUpdate('tables', order.tableId, { status: 'billing' }); // changed from available to billing
+  // 10. Update order status and table
+  try {
+    await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId).eq('restaurant_id', _restaurantId);
+  } catch { /* non-critical */ }
 
-  // Deduct stock
+  if (orderTableId) {
+    try { await dbUpdate('tables', orderTableId, { status: 'billing' }); }
+    catch { /* non-critical */ }
+  }
+
+  // 11. Deduct stock (non-critical)
   for (const item of items) {
-    const mid = item.menuItemId || item.menu_item_id;
-    if (!mid) continue;
-    const { data: menuI } = await supabase.from('menu_items').select('stock').eq('id', mid).eq('restaurant_id', _restaurantId).single();
-    if (menuI) {
-      const newStock = Math.max(0, menuI.stock - (item.quantity || 1));
-      await dbUpdate('menu_items', mid, { stock: newStock }); // using dbUpdate handles restaurant_id
-    }
+    try {
+      const mid = item.menuItemId;
+      if (!mid) continue;
+      const { data: menuI } = await supabase.from('menu_items').select('stock').eq('id', mid).eq('restaurant_id', _restaurantId).single();
+      if (menuI && menuI.stock !== -999) {
+        const newStock = Math.max(0, (menuI.stock || 0) - item.quantity);
+        await dbUpdate('menu_items', mid, { stock: newStock });
+      }
+    } catch { /* non-critical */ }
   }
 
-  return { 
-    bill: { 
-      ...bill, 
-      items, 
-      subtotal,
-      taxAmount,
-      taxRate: cfg.taxRate,
-      serviceCharge,
-      serviceChargeRate: cfg.serviceChargeRate,
-      discount,
-      discountAmount,
-      tableNumber: order.tableLabel,
+  return {
+    bill: {
+      ...bill,
+      items,
+      subtotal, taxAmount, taxRate: cfg.taxRate,
+      serviceCharge, serviceChargeRate: cfg.serviceChargeRate,
+      discount, discountAmount,
+      tableNumber: orderTableLabel,
       restaurantName: cfg.restaurantName,
       restaurantAddress: cfg.address || '',
       restaurantPhone: cfg.phone || '',
       gstNumber: cfg.gstNumber || '',
       currency: cfg.currency,
       billLayout: cfg.billLayout || {}
-    } 
+    }
   };
 }
 
@@ -414,7 +441,8 @@ export async function settleBill(billId, paymentMode) {
   if (!_restaurantId) throw new Error('No restaurant ID set.');
   if (!billId || !paymentMode) throw new Error('Bill ID and Payment Mode are required.');
 
-  const { data: bill } = await supabase.from('bills').select('orderId').eq('id', billId).eq('restaurant_id', _restaurantId).single();
+  // Fetch bill — handle both orderId and order_id columns
+  const { data: bill } = await supabase.from('bills').select('*').eq('id', billId).eq('restaurant_id', _restaurantId).single();
 
   const { error } = await supabase
     .from('bills')
@@ -423,11 +451,15 @@ export async function settleBill(billId, paymentMode) {
     .eq('restaurant_id', _restaurantId);
   if (error) throw error;
 
-  if (bill && bill.orderId) {
-     const { data: order } = await supabase.from('orders').select('tableId').eq('id', bill.orderId).eq('restaurant_id', _restaurantId).single();
-     if (order && order.tableId) {
-        await dbUpdate('tables', order.tableId, { status: 'available' });
-     }
+  const billOrderId = bill?.orderId || bill?.order_id;
+  if (billOrderId) {
+    try {
+      const { data: order } = await supabase.from('orders').select('*').eq('id', billOrderId).eq('restaurant_id', _restaurantId).single();
+      const tId = order?.tableId || order?.table_id;
+      if (tId) {
+        await dbUpdate('tables', tId, { status: 'available' });
+      }
+    } catch { /* non-critical — table status will be stale but won't crash */ }
   }
 
   return { success: true };
