@@ -67,30 +67,30 @@ export async function syncAll() {
 
       // NORMALIZE ALL DATA IN SYNCALL
       // PostgreSQL folds unquoted identifiers to lowercase, so we must check
-      // camelCase (orderId), snake_case (order_id), AND lowercase (orderid)
+      // camelCase, snake_case, lowercase, and PascalCase
       const normalizedData = res.data.map(row => ({
         ...row,
-        tableId: row.tableId || row.table_id || row.table_no || row.tableid,
-        tableLabel: row.tableLabel || row.table_label || row.tablelabel,
-        tableNumber: row.tableNumber || row.table_number || row.tablenumber,
-        orderId: row.orderId || row.order_id || row.orderid,
-        menuItemId: row.menuItemId || row.menu_item_id || row.menuitemid,
-        categoryType: row.categoryType || row.category_type || row.categorytype,
-        sessionId: row.sessionId || row.session_id || row.sessionid,
-        createdAt: row.createdAt || row.created_at || row.createdat,
-        billNumber: row.billNumber || row.bill_number || row.billnumber,
-        paymentMode: row.paymentMode || row.payment_mode || row.paymentmode,
-        billId: row.billId || row.bill_id || row.billid,
-        buyingPrice: row.buyingPrice || row.buying_price || row.buyingprice || 0,
-        deptId: row.deptId || row.dept_id || row.deptid,
-        startedAt: row.startedAt || row.started_at || row.startedat,
-        endedAt: row.endedAt || row.ended_at || row.endedat,
-        startedBy: row.startedBy || row.started_by || row.startedby,
-        endedBy: row.endedBy || row.ended_by || row.endedby,
-        sectionId: row.sectionId || row.section_id || row.sectionid,
-        quantity: row.quantity || row.qty || 0,
-        price: row.price || 0,
-        name: row.name || '',
+        tableId: row.tableId || row.table_id || row.tableid || row.TableId,
+        tableLabel: row.tableLabel || row.table_label || row.tablelabel || row.TableLabel,
+        tableNumber: row.tableNumber || row.table_number || row.tablenumber || row.TableNumber,
+        orderId: row.orderId || row.order_id || row.orderid || row.OrderId,
+        menuItemId: row.menuItemId || row.menu_item_id || row.menuitemid || row.MenuItemId,
+        categoryType: row.categoryType || row.category_type || row.categorytype || row.CategoryType,
+        sessionId: row.sessionId || row.session_id || row.sessionid || row.SessionId,
+        createdAt: row.createdAt || row.created_at || row.createdat || row.CreatedAt,
+        billNumber: row.billNumber || row.bill_number || row.billnumber || row.BillNumber,
+        paymentMode: row.paymentMode || row.payment_mode || row.paymentmode || row.PaymentMode,
+        billId: row.billId || row.bill_id || row.billid || row.BillId,
+        buyingPrice: row.buyingPrice || row.buying_price || row.buyingprice || row.BuyingPrice || 0,
+        deptId: row.deptId || row.dept_id || row.deptid || row.DeptId,
+        startedAt: row.startedAt || row.started_at || row.startedat || row.StartedAt,
+        endedAt: row.endedAt || row.ended_at || row.endedat || row.EndedAt,
+        startedBy: row.startedBy || row.started_by || row.startedby || row.StartedBy,
+        endedBy: row.endedBy || row.ended_by || row.endedby || row.EndedBy,
+        sectionId: row.sectionId || row.section_id || row.sectionid || row.SectionId,
+        quantity: row.quantity || row.qty || row.Quantity || row.Qty || 0,
+        price: row.price || row.Price || 0,
+        name: row.name || row.Name || '',
       }));
 
       if (tableName === 'config') {
@@ -246,7 +246,18 @@ export async function createOrder(tableId, tableLabel, customerName, createdBy) 
     try {
       order = await dbInsert('orders', snakeData);
     } catch (err2) {
-      throw new Error('Failed to create order: ' + err2.message);
+      const lowerData = {
+        id: orderId,
+        tableid: tableId,
+        tablelabel: tableLabel,
+        status: 'active',
+        createdby: createdBy
+      };
+      try {
+        order = await dbInsert('orders', lowerData);
+      } catch (err3) {
+        throw new Error('Failed to create order: ' + err3.message);
+      }
     }
   }
 
@@ -310,7 +321,21 @@ export async function addItemToOrder(orderId, item) {
     try {
       return await dbInsert('order_items', snakePayload);
     } catch (err2) {
-      throw new Error('Failed to add item to order: ' + err2.message);
+      const lowerPayload = {
+        orderid: orderId,
+        menuitemid: mId,
+        name: item.name,
+        price: finalPrice,
+        quantity: item.quantity || 1,
+        categorytype: itemDept,
+        note: item.note || '',
+        restaurant_id: _restaurantId
+      };
+      try {
+        return await dbInsert('order_items', lowerPayload);
+      } catch (err3) {
+        throw new Error('Failed to add item to order: ' + err3.message);
+      }
     }
   }
 }
@@ -560,11 +585,26 @@ export async function getOrderForTable(tableId) {
       .eq('restaurant_id', _restaurantId);
 
     if (!items || items.length === 0) {
-      const res = await supabase.from('order_items')
-        .select('*')
-        .eq('orderId', order.id)
-        .eq('restaurant_id', _restaurantId);
-      items = res.data;
+      try {
+        const res = await supabase.from('order_items')
+          .select('*')
+          .eq('orderId', order.id)
+          .eq('restaurant_id', _restaurantId);
+        if (res.data && res.data.length > 0) items = res.data;
+      } catch (e) { /* ignore */ }
+    }
+    
+    // Last resort fallback (handles 'orderid' lowercase etc.)
+    if (!items || items.length === 0) {
+      try {
+        const res3 = await supabase.from('order_items').select('*').eq('restaurant_id', _restaurantId);
+        if (res3.data) {
+          items = res3.data.filter(i => 
+            i.orderId === order.id || i.order_id === order.id || 
+            i.orderid === order.id || i.OrderId === order.id
+          );
+        }
+      } catch (e) { /* ignore */ }
     }
       
     order.items = (items || []).map(i => ({
