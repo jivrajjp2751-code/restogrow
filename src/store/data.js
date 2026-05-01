@@ -44,7 +44,7 @@ async function fetchAll(table) {
   let to = 999;
   while (true) {
     const { data, error } = await supabase.from(table).select('*').eq('restaurant_id', _restaurantId).range(from, to);
-    if (error) throw error;
+    if (error) return { error }; // DO NOT throw! Return error so syncAll can gracefully ignore missing tables.
     if (!data || data.length === 0) break;
     allData = allData.concat(data);
     if (data.length < 1000) break;
