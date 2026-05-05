@@ -445,17 +445,31 @@ export async function generateBill(orderId, discount) {
   };
 
   let bill;
+  const tryInsertBill = async (payload) => {
+    try { return await dbInsert('bills', { ...payload, sessionId }); }
+    catch (e1) {
+      try { return await dbInsert('bills', { ...payload, session_id: sessionId }); }
+      catch (e2) { return await dbInsert('bills', payload); }
+    }
+  };
+
   try {
-    bill = await dbInsert('bills', { ...baseBillPayload, sessionId });
-  } catch (err1) {
+    bill = await tryInsertBill(baseBillPayload);
+  } catch (err) {
+    // Fallback: strip newly added fields if they don't exist in the database schema yet
+    const fallbackPayload = { ...baseBillPayload };
+    delete fallbackPayload.discount;
+    delete fallbackPayload.discountAmount;
+    delete fallbackPayload.serviceCharge;
+    delete fallbackPayload.taxRate;
+    delete fallbackPayload.taxAmount;
+    delete fallbackPayload.subtotal;
+    delete fallbackPayload.tableNumber;
+    
     try {
-      bill = await dbInsert('bills', { ...baseBillPayload, session_id: sessionId });
-    } catch (err2) {
-      try {
-        bill = await dbInsert('bills', baseBillPayload);
-      } catch (err3) {
-        throw new Error('Bill creation failed: ' + err3.message);
-      }
+      bill = await tryInsertBill(fallbackPayload);
+    } catch (finalErr) {
+      throw new Error('Bill creation failed: ' + err.message);
     }
   }
 

@@ -101,7 +101,7 @@ export default function SettingsPage() {
       <div className="config-section" style={{ borderColor: 'rgba(94, 92, 230, 0.3)' }}>
         <h3 className="config-section-title"><FileText size={14} /> BILL LAYOUT / RECEIPT DESIGN</h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px' }}>
+        <div className="bill-layout-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px' }}>
           {/* Editor */}
           <div>
             <div className="config-grid">

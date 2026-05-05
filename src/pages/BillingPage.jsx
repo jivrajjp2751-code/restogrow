@@ -106,7 +106,7 @@ export default function BillingPage() {
 
   return (
     <div className="page-content">
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1fr) 350px', gap: '24px', alignItems: 'start' }}>
+      <div className="billing-layout-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 350px', gap: '24px', alignItems: 'start' }}>
         
         {/* LEFT COLUMN: Editor or Success */}
         <div>

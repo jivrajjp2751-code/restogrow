@@ -185,7 +185,7 @@ export default function TablesPage() {
             <span className="badge badge-warning" style={{ marginLeft: '8px' }}>NO SESSION</span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           {[
             { key: 'all', label: 'ALL' },
             { key: 'available', label: 'FREE' },

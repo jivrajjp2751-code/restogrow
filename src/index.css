@@ -1683,128 +1683,359 @@ ul, ol { list-style: none; }
   border-left: 3px solid var(--brand-warning);
 }
 
-/* ===== ADMIN RESPONSIVE LAYOUT ===== */
+/* ===== MOBILE-NATIVE LAYOUT ===== */
+/* Utility class to hide on mobile / show on desktop */
+.m-hide { display: none; }
+.m-show { display: block; }
+
+/* Mobile card-list replacement for data tables */
+.mobile-card-list { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.mobile-card-item {
+  background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  padding: 12px; display: flex; flex-direction: column; gap: 6px;
+}
+.mobile-card-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mobile-card-label { font-size: 10px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; font-family: var(--font-mono); }
+.mobile-card-value { font-size: 13px; font-weight: 700; font-family: var(--font-mono); }
+.mobile-card-actions { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+
+@media (min-width: 769px) {
+  .m-hide { display: block; }
+  .m-show { display: none !important; }
+}
+
 @media (max-width: 768px) {
+  /* ===== CORE LAYOUT ===== */
+  html { font-size: 14px; }
+  body { overflow: auto; height: 100dvh; }
+  #root { height: 100dvh; flex-direction: column; }
+
   .app-layout {
-    flex-direction: column;
+    flex-direction: column !important;
     height: 100dvh;
+    overflow: hidden;
   }
-  
-  /* Mobile Top Navigation */
+
+  /* ===== BOTTOM TAB BAR ===== */
   .sidebar {
-    width: 100%;
-    min-width: 100%;
-    height: 56px;
-    min-height: 56px;
+    order: 2;
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100vw !important;
+    min-width: 100vw !important;
+    height: 60px;
     flex-direction: row;
-    align-items: center;
-    border-right: none;
+    justify-content: space-around;
+    align-items: stretch;
+    padding: 0 !important;
+    border-right: none !important;
     border-top: 1px solid var(--border-color);
-    padding: 0 8px;
+    background: var(--bg-card);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
     z-index: 1000;
+    gap: 0 !important;
   }
-  .sidebar-brand-icon { display: none; }
+  .sidebar-brand-icon { display: none !important; }
   .sidebar-nav {
-    flex-direction: row;
+    flex-direction: row !important;
     width: 100%;
-    flex: 1;
+    height: 100%;
+    margin: 0 !important;
+    padding: 0 4px !important;
+    align-items: center;
+    justify-content: space-around;
+    gap: 0 !important;
     overflow-x: auto;
     overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    padding: 0 8px;
-    gap: 12px;
-    justify-content: flex-start;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
   .sidebar-nav::-webkit-scrollbar { display: none; }
   .sidebar-link {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    flex-shrink: 0;
-    padding: 0;
-  }
-  .sidebar-label { display: none; }
-  .sidebar-footer {
-    flex-direction: row;
-    height: auto;
-    padding: 0;
-    margin-left: 8px;
+    width: auto !important;
+    height: 100% !important;
+    min-width: 44px;
+    flex-direction: column;
+    padding: 4px 8px !important;
+    gap: 2px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--text-tertiary);
     flex-shrink: 0;
   }
-  
+  .sidebar-link svg { width: 20px; height: 20px; }
+  .sidebar-link.active {
+    color: var(--brand-primary) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-top: 3px solid var(--brand-primary);
+  }
+  .sidebar-link span.sidebar-label {
+    display: block !important;
+    font-size: 9px !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    opacity: 1 !important;
+  }
+  .sidebar-footer { display: none; }
+
+  /* ===== MAIN CONTENT AREA ===== */
   .main-content {
+    order: 1;
     flex: 1;
-    height: calc(100vh - 56px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: calc(100dvh - 60px) !important;
     width: 100vw;
     min-width: 0;
+    padding: 0 !important;
+    padding-bottom: 60px !important;
   }
-  
+
   .page-content {
-    padding: 12px;
+    padding: 12px !important;
+    padding-bottom: 80px !important;
     width: 100%;
     min-width: 0;
+    overflow-x: hidden;
   }
-  
-  /* Headers & Toggles */
+
+  /* ===== PAGE HEADERS ===== */
   .page-header {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+    align-items: stretch !important;
+    gap: 10px;
   }
+  .page-header > div:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .page-title { font-size: 14px; }
+
+  /* ===== TABS ===== */
   .tabs {
     width: 100%;
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
-  .tab { flex-shrink: 0; }
-  
-  /* Data Tables Framework */
-  .card {
-    width: 100%;
-    min-width: 0;
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex-shrink: 0; padding: 6px 10px; font-size: 10px; }
+  .tab-pills { width: 100%; }
+  .tab-pill { font-size: 10px; }
+
+  /* ===== DATA TABLES → MOBILE CARDS ===== */
+  .card { width: 100%; min-width: 0; }
+  .card-body { overflow-x: hidden; }
+  .data-table { min-width: 0 !important; width: 100% !important; }
+  .data-table th { font-size: 9px; padding: 4px 6px; }
+  .data-table td { font-size: 11px; padding: 6px; max-width: none; white-space: normal; word-break: break-word; }
+  .data-table.compact th { font-size: 8px; padding: 3px 4px; }
+  .data-table.compact td { font-size: 10px; padding: 4px; }
+
+  /* ===== STATS GRID ===== */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
   }
-  .card-body, .inventory-section-body, .page-content > .data-table { 
-    display: block;
-    width: 100%;
-    overflow-x: auto; 
-    -webkit-overflow-scrolling: touch; 
-  }
-  .data-table { 
-    min-width: 650px; 
-  }
-  
-  /* Modals */
-  .modal { width: 95%; max-height: 90vh; overflow-y: auto; }
-  .config-grid { grid-template-columns: 1fr; }
-  
-  /* Split view Inventory */
-  .inventory-split-container { flex-direction: column; width: 100%; min-width: 0; }
-  .inventory-section { min-width: 0; width: 100%; min-height: 300px; border-right: none; border-bottom: 1px solid var(--border-color); }
-  .inventory-section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-  
-  /* Settings page */
-  .settings-grid { grid-template-columns: 1fr; }
-  
-  /* Order Page & Billing Page Overrides */
-  .order-layout, .billing-split-container {
+  .stat-card { padding: 10px; gap: 8px; }
+  .stat-icon { width: 32px; height: 32px; }
+  .stat-icon svg { width: 16px; height: 16px; }
+  .stat-value { font-size: 16px; }
+  .stat-label { font-size: 9px; }
+
+  /* ===== CONFIG / SETTINGS ===== */
+  .config-section { padding: 12px; }
+  .config-grid { grid-template-columns: 1fr !important; gap: 8px; }
+  .config-section-title { font-size: 11px; }
+
+  /* ===== MODALS ===== */
+  .modal-backdrop { padding: 12px; }
+  .modal { width: 100% !important; max-width: 100% !important; max-height: 92vh; border-radius: 16px 16px 0 0; }
+  .modal-header { padding: 12px; }
+  .modal-body { padding: 12px; }
+  .modal-footer { padding: 10px 12px; flex-wrap: wrap; }
+  .modal-footer .btn { flex: 1; min-width: 100px; }
+
+  /* ===== ORDER LAYOUT ===== */
+  .order-layout {
     display: flex !important;
     flex-direction: column;
-    height: 100% !important;
+    height: calc(100dvh - 60px) !important;
+    grid-template-columns: 1fr !important;
+    gap: 0;
   }
-  .menu-panel, .billing-forms {
+  .menu-panel {
     flex: 1;
     min-height: 0;
+    overflow-y: auto;
+    border-right: none;
+    padding: 8px !important;
   }
-  .order-panel, .billing-live-preview {
-    border-left: none;
-    border-top: 1px solid var(--border-color);
+  .order-panel {
+    border-left: none !important;
+    border-top: 2px solid var(--border-color);
     height: auto !important;
+    max-height: 42vh;
     flex-shrink: 0;
-    max-height: 45vh;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
   }
   .menu-items-grid {
     grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px;
+  }
+  .menu-item-card { padding: 8px; min-height: 54px; }
+  .menu-item-name { font-size: 11px; }
+  .menu-item-price { font-size: 12px; }
+
+  /* ===== TABLE GRID ===== */
+  .table-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px;
+  }
+  .table-card { height: 80px; }
+  .table-number { font-size: 1.1rem; }
+  .table-section-header { flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 10px; }
+  .table-section-header > div:last-child { width: 100%; }
+
+  /* ===== INVENTORY ===== */
+  .inventory-grid { width: 100%; min-width: 0; }
+  .inventory-sections { width: 100%; min-width: 0; }
+  .inventory-section { width: 100%; min-width: 0; }
+  .inventory-split-container { flex-direction: column; width: 100%; min-width: 0; }
+  .inventory-section-header { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+  .category-tabs { gap: 4px; }
+  .category-tab { font-size: 10px; padding: 4px 8px; min-height: 26px; }
+
+  /* ===== SESSION PAGE ===== */
+  .session-hero { padding: 20px 16px; }
+  .session-logo { width: 52px; height: 52px; font-size: 22px; border-radius: 14px; }
+  .session-title { font-size: 18px; }
+  .session-date { font-size: 11px; }
+  .session-active-panel, .session-start-panel { padding: 16px; max-width: 100%; }
+  .session-status-badge { font-size: 11px; padding: 6px 12px; }
+  .session-start-btn { font-size: 14px !important; min-height: 44px !important; }
+
+  /* Past sessions */
+  .past-sessions-section { max-width: 100%; margin-top: 16px; }
+  .past-session-row { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+  .past-session-date { flex: 1; min-width: 80px; }
+  .past-session-date > div:first-child { font-size: 12px; }
+  .past-session-meta { min-width: 60px; font-size: 9px; }
+  .past-session-stats { min-width: 70px; }
+  .past-session-stats > div:first-child { font-size: 12px; }
+
+  /* ===== REPORTS PAGE ===== */
+  .page-content > div[style*="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)"],
+  .page-content > div[style*="grid-template-columns: 1fr 1fr"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  /* ===== BILLING PAGE ===== */
+  .page-content > div[style*="grid-template-columns: minmax(400px"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  /* ===== SETTINGS BILL LAYOUT ===== */
+  .config-section > div[style*="grid-template-columns: 1fr 300px"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  /* ===== SEARCH ===== */
+  .search-pill { width: 100%; }
+  .search-pill input { width: 100%; }
+  .search-input-wrapper { width: 100%; }
+
+  /* ===== BADGES / MISC ===== */
+  .badge { font-size: 9px; padding: 1px 5px; }
+  .payment-modes { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .payment-mode-btn { padding: 8px 4px; font-size: 11px; }
+
+  /* ===== STOCK INDICATOR ===== */
+  .stock-indicator { flex-wrap: nowrap; }
+  .stock-bar { width: 40px; }
+
+  /* ===== USERS PAGE ===== */
+  .page-content > div[style*="grid-template-columns: repeat(auto-fill"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ===== TOAST ON MOBILE ===== */
+  .toast-container { top: 8px; right: 8px; left: 8px; }
+  .toast { font-size: 11px; padding: 8px 10px; }
+
+  /* ===== LOGIN ===== */
+  .login-card { width: 92vw; max-width: 360px; padding: 28px 20px; }
+  .keypad .key { width: 60px; height: 60px; font-size: 20px; }
+  .keypad { gap: 12px; }
+
+  /* ===== CLASS-BASED LAYOUT OVERRIDES ===== */
+  .reports-two-col {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .billing-layout-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  .bill-layout-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  /* ===== INVENTORY TABLE MOBILE ===== */
+  .inventory-section .data-table th:nth-child(2),
+  .inventory-section .data-table td:nth-child(2) {
+    display: none;
+  }
+  .inventory-section .data-table th:nth-child(5),
+  .inventory-section .data-table td:nth-child(5) {
+    display: none;
+  }
+  .inventory-section .data-table td:last-child .btn { font-size: 9px; padding: 2px 4px; }
+
+  /* ===== SEARCH-PILL IN PAGE HEADER ===== */
+  .page-header .search-pill {
+    width: 100%;
+    margin: 0;
+  }
+  .page-header .search-pill input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* ===== SESSION REPORT GRID ===== */
+  .page-content > div[style*="grid-template-columns: repeat(auto-fit"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ===== MASTER PORTAL ===== */
+  .stats-grid[style*="grid-template-columns: repeat(2"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ===== TABLES PAGE FILTER BAR ===== */
+  .page-header > div[style*="gap: '4px'"],
+  .page-header > div[style*="gap: 4px"] {
+    flex-wrap: wrap;
+  }
+
+  /* ===== TABLES PAGE LEGEND ===== */
+  .page-content > div[style*="gap: '16px'"][style*="font-mono"] {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
   }
 }
 
@@ -1991,104 +2222,8 @@ ul, ol { list-style: none; }
   gap: 8px;
 }
 
-/* ===== MOBILE ADMIN LAYOUT FIX ===== */
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100vw !important;
-    min-width: 100vw !important;
-    height: 64px;
-    flex-direction: row;
-    justify-content: space-around;
-    padding: 0 8px !important;
-    border-right: none !important;
-    border-top: 2px solid var(--border-color);
-    background: var(--bg-card);
-    z-index: 1000;
-  }
-  .sidebar-brand-icon { display: none; }
-  .sidebar-nav {
-    flex-direction: row !important;
-    width: 100%;
-    height: 100%;
-    margin: 0 !important;
-    padding: 0 !important;
-    align-items: center;
-    justify-content: space-around;
-  }
-  .sidebar-link {
-    width: auto !important;
-    height: 100% !important;
-    flex-direction: column;
-    padding: 6px 12px !important;
-    gap: 2px !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-  }
-  .sidebar-link.active {
-    color: var(--brand-primary);
-    border-top: 3px solid var(--brand-primary);
-  }
-  .sidebar-link span { display: block !important; font-size: 9px; font-weight: 700; text-transform: uppercase; }
-  .sidebar-footer { display: none; }
-  
-  .app-layout {
-    flex-direction: column !important;
-  }
-  .main-content {
-    flex: 1;
-    overflow-y: auto;
-    height: calc(100vh - 64px);
-    padding: 12px !important;
-  }
 
-  /* Admin Page Refinements */
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start !important;
-    gap: 10px;
-  }
-  .page-title { font-size: 16px; }
-  
-  .stat-grid {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .inventory-split-container {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .order-layout {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 88px);
-    gap: 0;
-  }
-  .menu-panel { 
-    height: 60vh; 
-    border-right: none;
-    padding-bottom: 20px;
-  }
-  .order-panel { 
-    height: 40vh; 
-    border-top: 1px solid var(--border-color);
-    box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
-  }
-  
-  /* Tables/Grid refinements */
-  .table-grid {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
-  }
-  .table-card { padding: 10px !important; }
 
-  /* Modals on mobile */
-  .modal {
-    width: 95% !important;
-    max-height: 90vh;
-  }
-}
 
 /* ===== STAFF ORDER DRAWER ===== */
 .staff-order-drawer {

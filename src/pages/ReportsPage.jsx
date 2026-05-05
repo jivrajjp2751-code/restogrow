@@ -150,8 +150,8 @@ ${deptData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:cent
     <div className="page-content">
       <div className="page-header">
         <div className="page-title"><TrendingUp size={16} /> REPORTS</div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <div className="tabs" style={{ marginBottom: 0, border: 'none' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="tabs" style={{ marginBottom: 0, border: 'none', flex: '1 1 auto' }}>
             <button className={`tab ${reportType === 'daily' ? 'active' : ''}`} onClick={() => setReportType('daily')}>TODAY</button>
             <button className={`tab ${reportType === 'monthly' ? 'active' : ''}`} onClick={() => setReportType('monthly')}>MONTHLY</button>
             <button className={`tab ${reportType === 'session' ? 'active' : ''}`} onClick={() => setReportType('session')}>SESSION</button>
@@ -218,7 +218,7 @@ ${deptData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:cent
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+      <div className="reports-two-col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Payment Breakdown */}

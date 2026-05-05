@@ -57,12 +57,12 @@ export default function BillingHistoryPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-        <div className="search-input-wrapper" style={{ flex: 1, minWidth: '180px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+        <div className="search-input-wrapper" style={{ flex: '1 1 180px', minWidth: 0 }}>
           <Search />
           <input className="input" placeholder="Search bill # or table..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
         </div>
-        <select className="select" value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} style={{ width: '140px' }}>
+        <select className="select" value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} style={{ width: 'auto', minWidth: '100px', flex: '0 0 auto' }}>
           <option value="all">All</option>
           <option value="Cash">Cash</option>
           <option value="Card">Card</option>

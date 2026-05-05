@@ -111,13 +111,13 @@ export default function InventoryPage() {
     <div className="page-content">
       <div className="page-header">
         <div className="page-title"><Package size={16} /> INVENTORY</div>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div className="search-pill" style={{ margin: 0 }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
+          <div className="search-pill" style={{ margin: 0, flex: '1 1 160px', minWidth: 0 }}>
             <Search size={14} />
             <input type="text" placeholder="Search menu..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
           <div className="tab-pills">
-            <button className={`tab-pill ${activeTab === 'low' ? 'active' : ''}`} onClick={() => setActiveTab('low')}>LOW STOCK {lowStockItems.length > 0 && <span className="badge badge-danger" style={{marginLeft:'4px'}}>{lowStockItems.length}</span>}</button>
+            <button className={`tab-pill ${activeTab === 'low' ? 'active' : ''}`} onClick={() => setActiveTab(activeTab === 'low' ? 'stock' : 'low')}>LOW STOCK {lowStockItems.length > 0 && <span className="badge badge-danger" style={{marginLeft:'4px'}}>{lowStockItems.length}</span>}</button>
           </div>
         </div>
       </div>

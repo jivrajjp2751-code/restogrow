@@ -106,7 +106,7 @@ export default function SessionPage() {
       <div className="page-content">
         <div className="page-header">
           <div className="page-title"><BarChart3 size={16} /> {title}</div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={() => onPrint(r)}>
               <Printer size={14} /> PRINT REPORT
             </button>
@@ -146,7 +146,7 @@ export default function SessionPage() {
         </div>
 
         {/* Payment + Bar/Kitchen */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+        <div className="reports-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
           <div className="card">
             <div className="card-header"><span className="card-title">PAYMENT BREAKDOWN</span></div>
             <div className="card-body" style={{ padding: '0 12px' }}>
@@ -243,12 +243,12 @@ export default function SessionPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-              <button className="btn btn-success btn-lg" style={{ flex: 1 }} onClick={() => navigate('/tables')}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
+              <button className="btn btn-success btn-lg" style={{ flex: '1 1 140px' }} onClick={() => navigate('/tables')}>
                 <Play size={16} /> GO TO TABLES
               </button>
               {currentUser?.role === 'admin' && (
-                <button className="btn btn-danger btn-lg" onClick={() => setShowEndConfirm(true)}>
+                <button className="btn btn-danger btn-lg" style={{ flex: '1 1 140px' }} onClick={() => setShowEndConfirm(true)}>
                   <Square size={16} /> END SESSION
                 </button>
               )}
