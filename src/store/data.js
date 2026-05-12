@@ -381,11 +381,11 @@ export async function addItemToOrder(orderId, item) {
   }
 }
 
-export async function generateBill(orderId, discount) {
+export async function generateBill(orderId, discount, localOrder = null) {
   if (!_restaurantId) throw new Error('No restaurant ID set. Please reload the page.');
   if (!orderId) throw new Error('No order ID provided.');
 
-  // 1. Get Order (with retry for network errors)
+  // 1. Get Order (with retry for network errors, fallback to local data)
   let order = null;
   let orderErr = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -399,6 +399,13 @@ export async function generateBill(orderId, discount) {
       console.warn(`⚠️ generateBill: Order fetch attempt ${attempt}/3 failed:`, fetchErr.message);
     }
     if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
+  }
+  
+  // If Supabase fetch completely failed, use the locally cached order
+  if ((orderErr || !order) && localOrder) {
+    console.warn('⚠️ generateBill: Using locally cached order data (Supabase fetch failed)');
+    order = localOrder;
+    orderErr = null;
   }
   if (orderErr || !order) throw new Error('Order not found: ' + (orderErr?.message || 'unknown'));
 
@@ -431,6 +438,12 @@ export async function generateBill(orderId, discount) {
         );
       }
     } catch (e) { console.warn('Fallback order_items query failed:', e.message); }
+  }
+
+  // 4. Final fallback: use items from the locally cached order
+  if (items.length === 0 && localOrder && localOrder.items && localOrder.items.length > 0) {
+    console.warn('⚠️ generateBill: Using locally cached items (all Supabase queries failed)');
+    items = localOrder.items;
   }
 
   if (items.length === 0) {

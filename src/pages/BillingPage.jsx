@@ -41,7 +41,7 @@ export default function BillingPage() {
     if (busy) return;
     setBusy(true);
     try {
-      const result = await generateBill(orderId, discount);
+      const result = await generateBill(orderId, discount, order);
       if (result.bill) {
         result.bill.billLayout = billLayout;
         result.bill.cashierName = currentUser?.name || currentUser?.email || '';
