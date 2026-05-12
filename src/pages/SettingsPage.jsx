@@ -347,25 +347,85 @@ export default function SettingsPage() {
               });
               addToast('✅ Test KOT sent to print queue! Check the main PC.', 'success');
             } catch (e) { addToast('❌ Test failed: ' + e.message, 'error'); }
-          }}>📤 Send Test Print Job</button>
+          }}>📤 Send Test Print</button>
+          <button className="btn btn-warning btn-sm" onClick={async () => {
+            const results = [];
+            try {
+              const { supabase } = await import('../utils/supabase');
+              const rid = localStorage.getItem('rg_tenant_id');
+              results.push('Restaurant ID: ' + (rid || 'NOT SET ❌'));
+              results.push('isPrintStation: ' + localStorage.getItem('isPrintStation'));
+
+              // Step 1: Can we SELECT from print_jobs?
+              const { data: selData, error: selErr } = await supabase.from('print_jobs').select('id, status, type').limit(5);
+              if (selErr) {
+                results.push('❌ SELECT FAILED: ' + selErr.message);
+                results.push('');
+                results.push('⚠️ The print_jobs TABLE does not exist!');
+                results.push('Go to Supabase SQL Editor and run:');
+                results.push('');
+                results.push('CREATE TABLE print_jobs (');
+                results.push('  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,');
+                results.push('  restaurant_id UUID,');
+                results.push('  type TEXT NOT NULL,');
+                results.push('  content JSONB,');
+                results.push('  status TEXT DEFAULT \'pending\',');
+                results.push('  created_at TIMESTAMPTZ DEFAULT now()');
+                results.push(');');
+                results.push('ALTER TABLE print_jobs ENABLE ROW LEVEL SECURITY;');
+                results.push('CREATE POLICY "Allow all" ON print_jobs FOR ALL USING (true) WITH CHECK (true);');
+                results.push('ALTER PUBLICATION supabase_realtime ADD TABLE print_jobs;');
+                alert(results.join('\n'));
+                return;
+              }
+              results.push('✅ Table exists (' + (selData?.length || 0) + ' rows found)');
+
+              // Step 2: Check pending jobs
+              const { data: pending } = await supabase.from('print_jobs').select('id, type, created_at').eq('status', 'pending').eq('restaurant_id', rid);
+              results.push('📋 Pending jobs: ' + (pending?.length || 0));
+              if (pending?.length > 0) {
+                pending.forEach(j => results.push('   → ' + j.type + ' | ' + j.created_at));
+              }
+
+              // Step 3: Try INSERT
+              const testId = crypto.randomUUID ? crypto.randomUUID() : 'test-' + Date.now();
+              const { error: insErr } = await supabase.from('print_jobs').insert([{
+                id: testId, restaurant_id: rid, type: 'DIAG', content: { test: true }, status: 'pending', created_at: new Date().toISOString()
+              }]);
+              if (insErr) {
+                results.push('❌ INSERT FAILED: ' + insErr.message);
+                results.push('→ Check RLS policies on print_jobs table');
+              } else {
+                results.push('✅ INSERT works');
+                // Clean up
+                await supabase.from('print_jobs').delete().eq('id', testId);
+                results.push('✅ DELETE works (cleaned up test)');
+              }
+
+              results.push('');
+              results.push('If all checks pass but printing still fails:');
+              results.push('1. On MAIN PC: ensure "Print Station" is checked');
+              results.push('2. On MAIN PC: RELOAD the page (Ctrl+Shift+R)');
+              results.push('3. On MAIN PC: look for green "PRINTER ✓" badge bottom-right');
+              results.push('4. On MAIN PC: open console (F12) - look for 📠 logs');
+            } catch (e) {
+              results.push('❌ Error: ' + e.message);
+            }
+            alert(results.join('\n'));
+          }}>🔧 Run Diagnostics</button>
           <button className="btn btn-ghost btn-sm" onClick={async () => {
             try {
               const { supabase } = await import('../utils/supabase');
               const rid = localStorage.getItem('rg_tenant_id');
-              const { data, error } = await supabase.from('print_jobs').select('id, status, type, created_at').eq('restaurant_id', rid).eq('status', 'pending');
+              const { error } = await supabase.from('print_jobs').delete().eq('restaurant_id', rid).eq('status', 'pending');
               if (error) throw error;
-              if (data && data.length > 0) {
-                addToast(`📋 ${data.length} pending job(s) in queue`, 'warning');
-              } else {
-                addToast('✅ No pending print jobs in queue', 'success');
-              }
-            } catch (e) { addToast('Check failed: ' + e.message, 'error'); }
-          }}>🔍 Check Pending Jobs</button>
+              addToast('🧹 Cleared all pending print jobs', 'info');
+            } catch (e) { addToast('Clear failed: ' + e.message, 'error'); }
+          }}>🧹 Clear Queue</button>
         </div>
         <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '8px' }}>
-          💡 <b>How it works:</b> When this PC is NOT marked as print station, pressing "Print KOT" or "Print Bill" sends the job to Supabase.
-          The PC marked as print station listens for those jobs in real-time and prints them automatically.
-          Make sure the main PC has this page open and is marked as print station.
+          💡 <b>How it works:</b> Non-print-station PCs send jobs to Supabase → Main PC (print station) picks them up instantly and prints.
+          The main PC shows a green <b>🖨️ PRINTER ✓</b> badge in the bottom-right corner when active.
         </p>
       </div>
 

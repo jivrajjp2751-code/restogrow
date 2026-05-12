@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { useApp } from '../context/AppContext';
 import { markPrintJobDone } from '../store/data';
@@ -7,8 +7,11 @@ import { printSplitKOT, printBillDirect } from '../utils/print';
 export default function PrintListener() {
   const { config, currentUser } = useApp();
   const isPrintStation = localStorage.getItem('isPrintStation') === 'true';
-  const processingRef = useRef(new Set()); // Track jobs currently being processed
+  const processingRef = useRef(new Set());
   const mountedRef = useRef(true);
+  const [status, setStatus] = useState('idle'); // idle, active, error
+  const [lastJob, setLastJob] = useState(null);
+  const [jobCount, setJobCount] = useState(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -16,54 +19,59 @@ export default function PrintListener() {
   }, []);
 
   useEffect(() => {
-    if (!isPrintStation || !currentUser || !supabase) return;
+    if (!isPrintStation || !currentUser || !supabase) {
+      if (isPrintStation && !currentUser) {
+        console.log('📠 PrintListener: waiting for currentUser...');
+      }
+      return;
+    }
 
     const restaurantId = currentUser.restaurant_id;
     if (!restaurantId) {
       console.warn('📠 PrintListener: No restaurant_id on currentUser');
+      setStatus('error');
       return;
     }
 
-    console.log('📠 PrintListener ACTIVE — listening for print jobs (restaurant:', restaurantId, ')');
+    console.log('📠 PrintListener ACTIVE — restaurant:', restaurantId);
+    setStatus('active');
 
     // ===== Core job execution =====
     const executeJob = async (job) => {
-      // Prevent double-processing
       if (processingRef.current.has(job.id)) return;
       processingRef.current.add(job.id);
 
-      console.log(`📄 Processing job: ${job.type} [${job.id}]`);
+      console.log(`📄 Processing: ${job.type} [${job.id}]`);
+      setLastJob({ type: job.type, id: job.id, time: new Date().toLocaleTimeString() });
 
       try {
         if (job.type === 'KOT') {
           const content = job.content;
           if (!content || !content.order) {
-            console.error('❌ KOT job has no order data:', job.id);
+            console.error('❌ KOT job missing order data:', job.id);
             await markPrintJobDone(job.id);
             return;
           }
           const result = printSplitKOT(content.order, content.tableLabel, null, config);
-          console.log(`🍴 KOT Result: ${result.success ? 'Printed' : 'No matching departments'}`);
+          console.log(`🍴 KOT: ${result.success ? 'PRINTED' : 'No dept match'}`);
         } else if (job.type === 'BILL') {
           const content = job.content;
           if (!content || !content.bill) {
-            console.error('❌ BILL job has no bill data:', job.id);
+            console.error('❌ BILL job missing bill data:', job.id);
             await markPrintJobDone(job.id);
             return;
           }
           printBillDirect({ ...content.bill, currency: config.currency });
-          console.log('💵 Bill printed successfully');
+          console.log('💵 Bill PRINTED');
         } else {
           console.warn('⚠️ Unknown job type:', job.type);
         }
 
-        // Only mark done AFTER successful execution
         await markPrintJobDone(job.id);
-        console.log(`✅ Job ${job.id} marked complete`);
+        setJobCount(c => c + 1);
+        console.log(`✅ Job ${job.id} done`);
       } catch (err) {
-        console.error(`❌ Print job ${job.id} FAILED:`, err);
-        // Don't mark as done — it will be retried on next poll
-        // But if it's a data error (not a printer error), mark it done to avoid infinite retry
+        console.error(`❌ Print FAILED [${job.id}]:`, err);
         if (err.message?.includes('No bill') || err.message?.includes('No order')) {
           await markPrintJobDone(job.id);
         }
@@ -72,7 +80,7 @@ export default function PrintListener() {
       }
     };
 
-    // ===== Fetch and process all pending jobs =====
+    // ===== Poll for pending jobs =====
     const fetchPendingJobs = async () => {
       if (!mountedRef.current) return;
       try {
@@ -85,55 +93,91 @@ export default function PrintListener() {
 
         if (error) {
           console.error('📠 Poll error:', error.message);
+          setStatus('error');
           return;
         }
 
+        setStatus('active');
+
         if (data && data.length > 0) {
-          console.log(`📠 Found ${data.length} pending print job(s)`);
+          console.log(`📠 Found ${data.length} pending job(s)`);
           for (const job of data) {
             await executeJob(job);
           }
         }
       } catch (e) {
         console.error('📠 Poll exception:', e);
+        setStatus('error');
       }
     };
 
-    // ===== 1. Initial fetch on mount =====
+    // 1. Initial fetch
     fetchPendingJobs();
 
-    // ===== 2. Supabase Realtime subscription for INSTANT pickup =====
-    const channel = supabase
-      .channel('print-jobs-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'print_jobs',
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        (payload) => {
-          console.log('📠 Realtime: New print job inserted!', payload.new?.id);
-          if (payload.new && payload.new.status === 'pending') {
-            executeJob(payload.new);
+    // 2. Realtime subscription
+    let channel = null;
+    try {
+      channel = supabase
+        .channel('print-jobs-rt-' + restaurantId)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'print_jobs',
+            filter: `restaurant_id=eq.${restaurantId}`,
+          },
+          (payload) => {
+            console.log('📠 REALTIME: New job!', payload.new?.id);
+            if (payload.new && payload.new.status === 'pending') {
+              executeJob(payload.new);
+            }
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📠 Realtime subscription status:', status);
-      });
+        )
+        .subscribe((subStatus) => {
+          console.log('📠 Realtime status:', subStatus);
+        });
+    } catch (rtErr) {
+      console.warn('📠 Realtime setup failed (using polling only):', rtErr.message);
+    }
 
-    // ===== 3. Polling as fallback (every 5 seconds) =====
-    // Realtime should handle most cases, but polling catches any missed events
-    const intervalId = setInterval(fetchPendingJobs, 5000);
+    // 3. Polling fallback every 3 seconds
+    const intervalId = setInterval(fetchPendingJobs, 3000);
 
     return () => {
       console.log('📠 PrintListener cleanup');
       clearInterval(intervalId);
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [isPrintStation, currentUser, config]);
 
-  return null;
+  // Show a small status badge when this is a print station
+  if (!isPrintStation) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: '8px',
+        right: '8px',
+        zIndex: 9999,
+        background: status === 'active' ? 'rgba(78, 205, 196, 0.95)' : status === 'error' ? 'rgba(255, 107, 107, 0.95)' : 'rgba(150,150,150,0.9)',
+        color: '#fff',
+        padding: '6px 12px',
+        borderRadius: '20px',
+        fontSize: '10px',
+        fontWeight: 700,
+        fontFamily: 'monospace',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        cursor: 'pointer',
+        userSelect: 'none',
+      }}
+      title={`Status: ${status}\nJobs printed: ${jobCount}\nLast: ${lastJob ? `${lastJob.type} at ${lastJob.time}` : 'none'}`}
+      onClick={() => {
+        alert(`🖨️ PRINT STATION STATUS\n\nStatus: ${status.toUpperCase()}\nJobs printed this session: ${jobCount}\nLast job: ${lastJob ? `${lastJob.type} at ${lastJob.time} [${lastJob.id}]` : 'None yet'}\nRestaurant: ${currentUser?.restaurant_id || 'unknown'}\n\nIf status is ERROR, check:\n1. Internet connection\n2. Browser console (F12) for details`);
+      }}
+    >
+      🖨️ {status === 'active' ? `PRINTER ✓ (${jobCount})` : status === 'error' ? 'PRINTER ✗' : 'PRINTER...'}
+    </div>
+  );
 }
