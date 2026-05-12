@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase';
 import { useApp } from '../context/AppContext';
 import { markPrintJobDone } from '../store/data';
@@ -6,65 +6,134 @@ import { printSplitKOT, printBillDirect } from '../utils/print';
 
 export default function PrintListener() {
   const { config, currentUser } = useApp();
-  
-  // This listener should only run if the device is designated as a print station
-  // For now, we'll run it for all, but user can toggle it in settings or we can check role
   const isPrintStation = localStorage.getItem('isPrintStation') === 'true';
+  const processingRef = useRef(new Set()); // Track jobs currently being processed
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     if (!isPrintStation || !currentUser || !supabase) return;
 
-    let isPolling = false;
+    const restaurantId = currentUser.restaurant_id;
+    if (!restaurantId) {
+      console.warn('📠 PrintListener: No restaurant_id on currentUser');
+      return;
+    }
 
-    const pollJobs = async () => {
-      if (isPolling) return;
-      isPolling = true;
+    console.log('📠 PrintListener ACTIVE — listening for print jobs (restaurant:', restaurantId, ')');
+
+    // ===== Core job execution =====
+    const executeJob = async (job) => {
+      // Prevent double-processing
+      if (processingRef.current.has(job.id)) return;
+      processingRef.current.add(job.id);
+
+      console.log(`📄 Processing job: ${job.type} [${job.id}]`);
+
+      try {
+        if (job.type === 'KOT') {
+          const content = job.content;
+          if (!content || !content.order) {
+            console.error('❌ KOT job has no order data:', job.id);
+            await markPrintJobDone(job.id);
+            return;
+          }
+          const result = printSplitKOT(content.order, content.tableLabel, null, config);
+          console.log(`🍴 KOT Result: ${result.success ? 'Printed' : 'No matching departments'}`);
+        } else if (job.type === 'BILL') {
+          const content = job.content;
+          if (!content || !content.bill) {
+            console.error('❌ BILL job has no bill data:', job.id);
+            await markPrintJobDone(job.id);
+            return;
+          }
+          printBillDirect({ ...content.bill, currency: config.currency });
+          console.log('💵 Bill printed successfully');
+        } else {
+          console.warn('⚠️ Unknown job type:', job.type);
+        }
+
+        // Only mark done AFTER successful execution
+        await markPrintJobDone(job.id);
+        console.log(`✅ Job ${job.id} marked complete`);
+      } catch (err) {
+        console.error(`❌ Print job ${job.id} FAILED:`, err);
+        // Don't mark as done — it will be retried on next poll
+        // But if it's a data error (not a printer error), mark it done to avoid infinite retry
+        if (err.message?.includes('No bill') || err.message?.includes('No order')) {
+          await markPrintJobDone(job.id);
+        }
+      } finally {
+        processingRef.current.delete(job.id);
+      }
+    };
+
+    // ===== Fetch and process all pending jobs =====
+    const fetchPendingJobs = async () => {
+      if (!mountedRef.current) return;
       try {
         const { data, error } = await supabase
           .from('print_jobs')
           .select('*')
           .eq('status', 'pending')
-          .eq('restaurant_id', currentUser.restaurant_id)
+          .eq('restaurant_id', restaurantId)
           .order('created_at', { ascending: true });
-          
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          console.log(`📠 Found ${data.length} new print jobs`);
-          for (const job of data) {
-            console.log('📄 Executing:', job.type, job.id);
-            
-            // Mark immediately so we don't double print
-            await markPrintJobDone(job.id);
 
-            try {
-              if (job.type === 'KOT') {
-                const results = printSplitKOT(job.content.order, job.content.tableLabel, null, config);
-                console.log(`🍴 KOT Split Result: ${results.success ? 'Success' : 'No items matched departments'}`);
-              } else if (job.type === 'BILL') {
-                printBillDirect({ ...job.content.bill, currency: config.currency });
-                console.log('💵 Bill printed');
-              }
-            } catch (err) {
-              console.error('❌ Print job execution failed:', err);
-            }
+        if (error) {
+          console.error('📠 Poll error:', error.message);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          console.log(`📠 Found ${data.length} pending print job(s)`);
+          for (const job of data) {
+            await executeJob(job);
           }
         }
       } catch (e) {
-        console.error('Print queue polling error:', e);
-      } finally {
-        isPolling = false;
+        console.error('📠 Poll exception:', e);
       }
     };
 
-    // Initial check
-    pollJobs();
-    
-    // Poll every 4 seconds
-    const intervalId = setInterval(pollJobs, 4000);
+    // ===== 1. Initial fetch on mount =====
+    fetchPendingJobs();
 
-    return () => clearInterval(intervalId);
+    // ===== 2. Supabase Realtime subscription for INSTANT pickup =====
+    const channel = supabase
+      .channel('print-jobs-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'print_jobs',
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        (payload) => {
+          console.log('📠 Realtime: New print job inserted!', payload.new?.id);
+          if (payload.new && payload.new.status === 'pending') {
+            executeJob(payload.new);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📠 Realtime subscription status:', status);
+      });
+
+    // ===== 3. Polling as fallback (every 5 seconds) =====
+    // Realtime should handle most cases, but polling catches any missed events
+    const intervalId = setInterval(fetchPendingJobs, 5000);
+
+    return () => {
+      console.log('📠 PrintListener cleanup');
+      clearInterval(intervalId);
+      supabase.removeChannel(channel);
+    };
   }, [isPrintStation, currentUser, config]);
 
-  return null; // Or a small status indicator
+  return null;
 }

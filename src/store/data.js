@@ -194,16 +194,45 @@ export async function addTable(data) {
 
 // --- PRINT QUEUE SYSTEM ---
 export async function createPrintJob(type, content) {
-  return dbInsert('print_jobs', {
+  if (!_restaurantId) throw new Error('No restaurant ID set. Please reload.');
+  
+  const job = await dbInsert('print_jobs', {
     type,
     content,
     status: 'pending',
     created_at: new Date().toISOString()
   });
+  
+  console.log(`📠 Print job created: ${type} [${job?.id}]`);
+  
+  // Verify the job exists in the database (catches silent insert failures)
+  try {
+    const { data: verify } = await supabase
+      .from('print_jobs')
+      .select('id, status')
+      .eq('id', job.id)
+      .single();
+    
+    if (!verify) {
+      console.error('📠 Print job verification FAILED — job not found after insert');
+      throw new Error('Print job was not saved. Check your database connection.');
+    }
+    console.log(`📠 Print job verified: ${verify.id} status=${verify.status}`);
+  } catch (verifyErr) {
+    if (verifyErr.message?.includes('not saved')) throw verifyErr;
+    console.warn('📠 Verification query failed (non-critical):', verifyErr.message);
+  }
+  
+  return job;
 }
 
 export async function markPrintJobDone(jobId) {
-  return dbUpdate('print_jobs', jobId, { status: 'completed' });
+  if (!jobId) return;
+  try {
+    await dbUpdate('print_jobs', jobId, { status: 'completed' });
+  } catch (err) {
+    console.warn('📠 Failed to mark job done (non-critical):', err.message);
+  }
 }
 
 export async function addSection(data) {
@@ -356,8 +385,21 @@ export async function generateBill(orderId, discount) {
   if (!_restaurantId) throw new Error('No restaurant ID set. Please reload the page.');
   if (!orderId) throw new Error('No order ID provided.');
 
-  // 1. Get Order
-  const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).eq('restaurant_id', _restaurantId).single();
+  // 1. Get Order (with retry for network errors)
+  let order = null;
+  let orderErr = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await supabase.from('orders').select('*').eq('id', orderId).eq('restaurant_id', _restaurantId).single();
+      order = res.data;
+      orderErr = res.error;
+      if (order && !orderErr) break;
+    } catch (fetchErr) {
+      orderErr = fetchErr;
+      console.warn(`⚠️ generateBill: Order fetch attempt ${attempt}/3 failed:`, fetchErr.message);
+    }
+    if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
+  }
   if (orderErr || !order) throw new Error('Order not found: ' + (orderErr?.message || 'unknown'));
 
   // Normalize order fields

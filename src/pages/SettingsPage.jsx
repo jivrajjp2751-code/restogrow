@@ -324,15 +324,49 @@ export default function SettingsPage() {
       <div className="config-section">
         <h3 className="config-section-title">🖨️ REMOTE PRINTING</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '12px' }}>
-          Enable this on the primary PC connected to the printer.
+          Enable this on the primary PC connected to the printer. Other PCs will send print jobs to this station.
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: isPrintStation ? 'rgba(78, 205, 196, 0.1)' : '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid', borderColor: isPrintStation ? '#4ecdc4' : 'transparent' }}>
-          <input type="checkbox" checked={isPrintStation} onChange={e => setIsPrintStation(e.target.checked)} style={{ width: '20px', height: '20px' }} />
+          <input type="checkbox" checked={isPrintStation} onChange={e => {
+            setIsPrintStation(e.target.checked);
+            localStorage.setItem('isPrintStation', e.target.checked);
+            addToast(e.target.checked ? '✅ Print station ENABLED — reload page to activate listener' : '⏸️ Print station DISABLED', 'info');
+          }} style={{ width: '20px', height: '20px' }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: '13px' }}>Mark this device as PRINT STATION</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Status: {isPrintStation ? 'LISTENING FOR JOBS' : 'INACTIVE'}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Status: {isPrintStation ? '✅ LISTENING FOR JOBS' : '⏸️ INACTIVE — prints will be queued for the main PC'}</div>
           </div>
         </div>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary btn-sm" onClick={async () => {
+            try {
+              const { createPrintJob } = await import('../store/data');
+              await createPrintJob('KOT', {
+                order: { items: [{ name: 'TEST ITEM', quantity: 1, categoryType: 'kitchen', deptId: 'kitchen' }] },
+                tableLabel: 'TEST'
+              });
+              addToast('✅ Test KOT sent to print queue! Check the main PC.', 'success');
+            } catch (e) { addToast('❌ Test failed: ' + e.message, 'error'); }
+          }}>📤 Send Test Print Job</button>
+          <button className="btn btn-ghost btn-sm" onClick={async () => {
+            try {
+              const { supabase } = await import('../utils/supabase');
+              const rid = localStorage.getItem('rg_tenant_id');
+              const { data, error } = await supabase.from('print_jobs').select('id, status, type, created_at').eq('restaurant_id', rid).eq('status', 'pending');
+              if (error) throw error;
+              if (data && data.length > 0) {
+                addToast(`📋 ${data.length} pending job(s) in queue`, 'warning');
+              } else {
+                addToast('✅ No pending print jobs in queue', 'success');
+              }
+            } catch (e) { addToast('Check failed: ' + e.message, 'error'); }
+          }}>🔍 Check Pending Jobs</button>
+        </div>
+        <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '8px' }}>
+          💡 <b>How it works:</b> When this PC is NOT marked as print station, pressing "Print KOT" or "Print Bill" sends the job to Supabase.
+          The PC marked as print station listens for those jobs in real-time and prints them automatically.
+          Make sure the main PC has this page open and is marked as print station.
+        </p>
       </div>
 
       <div className="config-section" style={{ borderColor: 'rgba(255,107,107,0.3)' }}>
