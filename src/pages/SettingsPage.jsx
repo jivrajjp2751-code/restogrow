@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp, useToast } from '../context/AppContext';
 import { updateConfig } from '../store/data';
-import { Settings, Store, Receipt, RefreshCw, FileText } from 'lucide-react';
+import { Settings, Store, Receipt, FileText } from 'lucide-react';
 
 const DEFAULT_BILL_LAYOUT = {
   restaurantName: '',
@@ -45,12 +45,7 @@ export default function SettingsPage() {
     finally { setBusy(false); }
   };
 
-  const handleReset = () => {
-    if (confirm('RESET ALL DATA? This clears everything and cannot be undone.')) {
-      localStorage.clear();
-      window.location.reload();
-    }
-  };
+
 
 
 
@@ -429,52 +424,9 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="config-section" style={{ borderColor: 'rgba(255,107,107,0.3)' }}>
-        <h3 className="config-section-title" style={{ color: 'var(--brand-danger)' }}><RefreshCw size={14} /> DANGER ZONE</h3>
-        <p style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '10px' }}>
-          <b>START LIVE:</b> This will delete all trial bills, sessions, and orders but KEEP your menu items and settings. Use this before your official opening.
-        </p>
-        <button className="btn btn-danger" onClick={handleWipeData} style={{ marginRight: '8px', background: '#ff4757' }}>WIPE TRIAL DATA (START LIVE)</button>
-        <button className="btn btn-ghost" onClick={handleReset} style={{ color: 'var(--brand-danger)', fontSize: '11px' }}>RESET ALL DATA</button>
-      </div>
+
     </div>
   );
 
-  async function handleWipeData() {
-    if (!confirm("🚨 DANGER: This will delete ALL Bills, Orders, and Sessions. Your Menu Items and Categories will be safe. Start Live now?")) return;
-    
-    setBusy(true);
-    const { supabase } = await import('../utils/supabase');
-    const rid = localStorage.getItem('rg_tenant_id');
-    if (!rid) {
-      addToast("Error: Tenant ID not found", "error");
-      setBusy(false);
-      return;
-    }
 
-    // Explicit order: items first to avoid foreign key errors
-    const tables = ['bill_items', 'order_items', 'print_jobs', 'inventory_log', 'bills', 'orders', 'sessions'];
-    
-    try {
-      console.log("🧹 Wiping transactional data for tenant:", rid);
-      for (const t of tables) {
-        const { error } = await supabase.from(t).delete().eq('restaurant_id', rid);
-        if (error) {
-          console.warn(`⚠️ Table ${t} wipe failed or skipped:`, error.message);
-        } else {
-          console.log(`✅ Table ${t} cleared`);
-        }
-      }
-      
-      // Force table status reset
-      await supabase.from('tables').update({ status: 'available' }).eq('restaurant_id', rid);
-      
-      addToast("✨ PREPARATION COMPLETE: System is now LIVE & Clean!", "success");
-      setTimeout(() => window.location.reload(), 2000);
-    } catch (e) {
-      addToast("Wipe failed: " + e.message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
 }

@@ -3,6 +3,7 @@ import { lazy, Suspense, Component } from 'react';
 import { AppProvider, ToastProvider, useApp } from './context/AppContext';
 import Sidebar from './components/Sidebar';
 import PrintListener from './components/PrintListener';
+import PrintQueuePanel from './components/PrintQueuePanel';
 import './index.css';
 
 // Global Error Boundary — catches any uncaught React rendering errors
@@ -62,18 +63,64 @@ function ProtectedLayout() {
 
   if (restaurant?.status === 'suspended') {
     return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#F8F9FC', padding: '20px', textAlign: 'center' }}>
-         <div style={{ background: '#fff', padding: '48px', borderRadius: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', maxWidth: '500px' }}>
-           <div style={{ fontSize: '64px', marginBottom: '24px' }}>🔒</div>
-           <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#1A1B2E', marginBottom: '16px' }}>Membership Expired</h2>
-           <p style={{ color: '#5A5E73', lineHeight: '1.6', marginBottom: '32px' }}>
-             Your access to <b>{restaurant.name || 'RestoGrow'}</b> has been temporarily suspended. 
-             Please contact the administrator to renew your membership and restore access to your data.
+      <div style={{
+        height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        background: '#1A1B2E', backgroundImage: 'radial-gradient(circle at top right, #2D2B52 0%, #1A1B2E 60%, #12131F 100%)',
+        padding: '20px', textAlign: 'center', fontFamily: "'Inter', -apple-system, sans-serif",
+      }}>
+         <div style={{
+           background: 'rgba(25, 26, 46, 0.85)', padding: '48px 40px', borderRadius: '24px',
+           border: '1px solid rgba(255, 255, 255, 0.08)', maxWidth: '440px', width: '100%',
+           boxShadow: '0 24px 64px rgba(0,0,0,0.4), 0 0 80px rgba(108, 92, 231, 0.08)',
+           backdropFilter: 'blur(20px)',
+           animation: 'slideUp 0.4s ease',
+         }}>
+           <div style={{
+             width: '72px', height: '72px', borderRadius: '20px', margin: '0 auto 24px',
+             background: 'linear-gradient(135deg, rgba(255, 59, 48, 0.15), rgba(255, 159, 10, 0.15))',
+             border: '1px solid rgba(255, 107, 107, 0.2)',
+             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px',
+           }}>🔒</div>
+           <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px', letterSpacing: '0.02em' }}>
+             Access Suspended
+           </h2>
+           <div style={{
+             fontSize: '11px', fontWeight: 700, color: '#FF6B6B', background: 'rgba(255, 107, 107, 0.12)',
+             padding: '4px 14px', borderRadius: '20px', display: 'inline-block', marginBottom: '20px',
+             fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em', textTransform: 'uppercase',
+             border: '1px solid rgba(255, 107, 107, 0.2)',
+           }}>MEMBERSHIP EXPIRED</div>
+           <p style={{ color: 'rgba(255, 255, 255, 0.55)', lineHeight: '1.7', marginBottom: '28px', fontSize: '14px' }}>
+             Your access to <span style={{ color: '#FFFFFF', fontWeight: 700 }}>{restaurant.name || 'RestoGrow'}</span> has been temporarily suspended.
+             Please contact the administrator to renew your membership and restore access.
            </p>
-           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-             <button className="btn btn-primary" onClick={() => window.location.reload()}>RETRY</button>
-             <button className="btn btn-secondary" onClick={logout}>LOGOUT</button>
+           <div style={{
+             background: 'rgba(255, 255, 255, 0.04)', borderRadius: '12px', padding: '14px 16px', marginBottom: '28px',
+             border: '1px solid rgba(255, 255, 255, 0.06)',
+           }}>
+             <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: "'JetBrains Mono', monospace" }}>
+               CONTACT SUPPORT
+             </div>
+             <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500 }}>
+               Reach out to your RestoGrow administrator to reactivate your account.
+             </div>
            </div>
+           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+             <button onClick={() => window.location.reload()} style={{
+               flex: 1, padding: '12px 20px', borderRadius: '10px', fontWeight: 700, fontSize: '13px',
+               background: '#6C5CE7', color: 'white', border: 'none', cursor: 'pointer',
+               boxShadow: '0 4px 16px rgba(108, 92, 231, 0.3)', transition: 'all 0.15s ease',
+             }}>RETRY</button>
+             <button onClick={logout} style={{
+               flex: 1, padding: '12px 20px', borderRadius: '10px', fontWeight: 700, fontSize: '13px',
+               background: 'rgba(255, 255, 255, 0.06)', color: 'rgba(255, 255, 255, 0.7)',
+               border: '1px solid rgba(255, 255, 255, 0.1)', cursor: 'pointer', transition: 'all 0.15s ease',
+             }}>LOGOUT</button>
+           </div>
+         </div>
+         <div style={{ marginTop: '24px', fontSize: '11px', color: 'rgba(255,255,255,0.25)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
+           <span style={{ width: '20px', height: '20px', borderRadius: '6px', background: 'linear-gradient(135deg, #6C5CE7, #00CEC9)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 800, color: 'white' }}>RG</span>
+           Powered by RestoGrow
          </div>
       </div>
     );
@@ -119,6 +166,7 @@ function ProtectedLayout() {
           </Routes>
         </Suspense>
       </main>
+      <PrintQueuePanel />
     </div>
   );
 }

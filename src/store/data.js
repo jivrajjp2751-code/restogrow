@@ -235,6 +235,56 @@ export async function markPrintJobDone(jobId) {
   }
 }
 
+export async function fetchPendingPrintJobs() {
+  if (!_restaurantId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('print_jobs')
+      .select('*')
+      .eq('status', 'pending')
+      .eq('restaurant_id', _restaurantId)
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.warn('📠 fetchPendingPrintJobs error:', error.message);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.warn('📠 fetchPendingPrintJobs exception:', e.message);
+    return [];
+  }
+}
+
+export async function cancelPrintJob(jobId) {
+  if (!jobId || !_restaurantId) return;
+  try {
+    const { error } = await supabase
+      .from('print_jobs')
+      .delete()
+      .eq('id', jobId)
+      .eq('restaurant_id', _restaurantId);
+    if (error) throw error;
+  } catch (err) {
+    console.error('📠 cancelPrintJob failed:', err.message);
+    throw err;
+  }
+}
+
+export async function clearAllPendingPrintJobs() {
+  if (!_restaurantId) return;
+  try {
+    const { error } = await supabase
+      .from('print_jobs')
+      .delete()
+      .eq('restaurant_id', _restaurantId)
+      .eq('status', 'pending');
+    if (error) throw error;
+  } catch (err) {
+    console.error('📠 clearAllPendingPrintJobs failed:', err.message);
+    throw err;
+  }
+}
+
 export async function addSection(data) {
   const { name, icon, color, surcharge, surchargeDepts } = data;
   return dbInsert('sections', { name, icon, color, surcharge: Number(surcharge) || 0, surchargeDepts: surchargeDepts || [] });

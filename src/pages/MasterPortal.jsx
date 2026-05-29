@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
-import { Loader2, ShieldCheck, Plus, Store, Users, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, ShieldCheck, Plus, Store, Users, ExternalLink, RefreshCw, Key, X, Eye, EyeOff } from 'lucide-react';
 
 export default function MasterPortal() {
   const [restaurants, setRestaurants] = useState([]);
@@ -8,11 +8,20 @@ export default function MasterPortal() {
   const [showAdd, setShowAdd] = useState(false);
   const [stats, setStats] = useState({ total: 0, active: 0 });
   const [dbError, setDbError] = useState('');
-
   const [authorized, setAuthorized] = useState(false);
 
+  // Change password modal state
+  const [showChangePw, setShowChangePw] = useState(null); // null = hidden, or { userId, email, restaurantName }
+  const [newPassword, setNewPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [pwBusy, setPwBusy] = useState(false);
+
+  // Change Fleet Key modal state
+  const [showChangeKey, setShowChangeKey] = useState(false);
+  const [currentKey, setCurrentKey] = useState('');
+  const [newKey, setNewKey] = useState('');
+
   useEffect(() => {
-    // Basic frontend authorization gate to prevent accidental leakage to unauth visitors
     const key = prompt("Enter Master Fleet Access Key:");
     if (key === "MFL@fleet2026") {
       setAuthorized(true);
@@ -27,7 +36,7 @@ export default function MasterPortal() {
     setDbError('');
     try {
       if (!supabase) throw new Error("Supabase client not initialized. Check Env Vars.");
-      const { data: res, error } = await supabase.from('restaurants').select('*, users(email, password, role)');
+      const { data: res, error } = await supabase.from('restaurants').select('*, users(id, email, password, role)');
       if (error) throw error;
       setRestaurants(res || []);
       setStats({
@@ -55,7 +64,6 @@ export default function MasterPortal() {
 
       if (rError) throw rError;
 
-      // 2. Create Initial Admin User for that restaurant
       const email = `admin@${slug}.com`;
       const password = 'admin123';
       
@@ -66,7 +74,7 @@ export default function MasterPortal() {
           name: 'Admin', 
           email: email,
           password: password,
-          pin: '0000', // fallback to satisfy db constraint
+          pin: '0000',
           role: 'admin'
         }]);
 
@@ -94,11 +102,46 @@ export default function MasterPortal() {
   const deleteRestaurant = async (id, name) => {
     if (!window.confirm(`WARNING: Are you absolutely sure you want to delete ${name}? This will permanently wipe all users, orders, bills, and data for this hotel.`)) return;
     try {
+      // Cascade delete all dependent tables first (order matters for FK constraints)
+      const dependentTables = ['print_jobs', 'bill_items', 'order_items', 'inventory_log', 'bills', 'orders', 'sessions', 'config', 'menu_items', 'tables', 'sections', 'users'];
+      for (const table of dependentTables) {
+        try {
+          await supabase.from(table).delete().eq('restaurant_id', id);
+        } catch {
+          // Some tables may not exist — continue silently
+        }
+      }
+      // Now delete the restaurant itself
       const { error } = await supabase.from('restaurants').delete().eq('id', id);
       if (error) throw error;
       fetchData();
     } catch (e) {
       alert('Error deleting: ' + e.message);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!showChangePw || !newPassword.trim()) return;
+    if (newPassword.trim().length < 4) {
+      alert('Password must be at least 4 characters.');
+      return;
+    }
+    setPwBusy(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ password: newPassword.trim() })
+        .eq('id', showChangePw.userId);
+      if (error) throw error;
+      alert(`✅ Password updated for ${showChangePw.email}`);
+      setShowChangePw(null);
+      setNewPassword('');
+      setShowPw(false);
+      fetchData();
+    } catch (e) {
+      alert('Error updating password: ' + e.message);
+    } finally {
+      setPwBusy(false);
     }
   };
 
@@ -180,7 +223,19 @@ export default function MasterPortal() {
                     <tr key={r.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                       <td style={{ padding: '16px 24px', fontWeight: 600, color: '#0F172A' }}>{r.name}</td>
                       <td style={{ padding: '16px 24px', fontSize: '12px', color: '#334155', fontFamily: 'monospace' }}>
-                         {adminUser ? ( <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}><div><b>U:</b> {adminUser.email}</div><div><b>P:</b> {adminUser.password}</div></div> ) : <span style={{ color: '#94A3B8' }}>None</span>}
+                         {adminUser ? (
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                             <div><b>U:</b> {adminUser.email}</div>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                               <span><b>P:</b> {adminUser.password}</span>
+                               <button
+                                 onClick={() => { setShowChangePw({ userId: adminUser.id, email: adminUser.email, restaurantName: r.name }); setNewPassword(''); setShowPw(false); }}
+                                 title="Change Password"
+                                 style={{ width: '22px', height: '22px', borderRadius: '4px', background: '#EEF2FF', border: '1px solid #C7D2FE', color: '#6C5CE7', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: '0.15s' }}
+                               ><Key size={11} /></button>
+                             </div>
+                           </div>
+                         ) : <span style={{ color: '#94A3B8' }}>None</span>}
                       </td>
                       <td style={{ padding: '16px 24px' }}>
                         <span className={`badge ${isActive ? 'badge-success' : 'badge-danger'}`} style={{ 
@@ -223,7 +278,7 @@ export default function MasterPortal() {
         </div>
       )}
 
-      {/* Add Modal */}
+      {/* Add Restaurant Modal */}
       {showAdd && (
         <div className="modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <form className="modal" onSubmit={handleAdd} style={{ background: '#fff', padding: '32px', borderRadius: '20px', width: '400px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
@@ -245,6 +300,79 @@ export default function MasterPortal() {
                <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: 600, background: '#6C5CE7', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 6px rgba(108, 92, 231, 0.2)' }}>Deploy Client</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showChangePw && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#fff', padding: '32px', borderRadius: '20px', width: '400px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', animation: 'slideUp 0.2s ease' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706' }}>
+                  <Key size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0F172A' }}>Change Password</h2>
+                  <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>{showChangePw.restaurantName}</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowChangePw(null); setNewPassword(''); setShowPw(false); }} style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#F1F5F9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* User info */}
+            <div style={{ background: '#F8FAFC', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>ACCOUNT</div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', fontFamily: 'monospace' }}>{showChangePw.email}</div>
+            </div>
+
+            {/* New password input */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>New Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  autoFocus
+                  style={{ width: '100%', padding: '12px 44px 12px 16px', border: '1px solid #CBD5E1', borderRadius: '10px', fontSize: '15px', color: '#0F172A', outline: 'none', transition: 'border 0.2s', boxSizing: 'border-box' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: '4px' }}
+                >
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>Minimum 4 characters. The user will need to log in with this new password.</p>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => { setShowChangePw(null); setNewPassword(''); setShowPw(false); }}
+                style={{ flex: 1, padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: 600, background: '#F1F5F9', color: '#475569', border: 'none', cursor: 'pointer' }}
+              >Cancel</button>
+              <button
+                type="button"
+                onClick={handleChangePassword}
+                disabled={pwBusy || !newPassword.trim()}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: 600,
+                  background: (!newPassword.trim() || pwBusy) ? '#CBD5E1' : '#6C5CE7',
+                  color: '#fff', border: 'none', cursor: (!newPassword.trim() || pwBusy) ? 'not-allowed' : 'pointer',
+                  boxShadow: newPassword.trim() ? '0 4px 6px rgba(108, 92, 231, 0.2)' : 'none',
+                  transition: '0.2s',
+                }}
+              >{pwBusy ? 'Updating...' : 'Update Password'}</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

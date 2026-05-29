@@ -39,6 +39,11 @@ export default function PrintListener() {
     // ===== Core job execution =====
     const executeJob = async (job) => {
       if (processingRef.current.has(job.id)) return;
+      // Respect pause state from Print Queue Panel
+      if (localStorage.getItem('printingPaused') === 'true') {
+        console.log('📠 Printing is PAUSED — skipping job', job.id);
+        return;
+      }
       processingRef.current.add(job.id);
 
       console.log(`📄 Processing: ${job.type} [${job.id}]`);
