@@ -160,6 +160,58 @@ export default function PrintListener() {
       }
     };
 
+    // ===== Dedup: remove duplicate pending jobs to prevent paper waste =====
+    const deduplicateJobs = async (jobs) => {
+      if (!jobs || jobs.length <= 1) return jobs;
+
+      const seen = new Map(); // signature → first job
+      const dupeIds = [];
+
+      for (const job of jobs) {
+        let sig = '';
+        if (job.type === 'BILL') {
+          const billNo = job.content?.bill?.billNumber;
+          sig = billNo ? `BILL:${billNo}` : `BILL:${job.id}`;
+        } else if (job.type === 'KOT') {
+          const orderId = job.content?.order?.id;
+          const tableLabel = job.content?.tableLabel || '';
+          const itemSig = (job.content?.order?.items || [])
+            .map(i => `${i.name}:${i.quantity}`)
+            .sort()
+            .join('|');
+          sig = orderId ? `KOT:${orderId}:${tableLabel}:${itemSig}` : `KOT:${job.id}`;
+        } else {
+          sig = `OTHER:${job.id}`;
+        }
+
+        if (seen.has(sig)) {
+          // This is a duplicate — mark for removal
+          dupeIds.push(job.id);
+        } else {
+          seen.set(sig, job);
+        }
+      }
+
+      // Auto-remove duplicates from the database
+      if (dupeIds.length > 0) {
+        console.warn(`📠 AUTO-DEDUP: Removing ${dupeIds.length} duplicate job(s) to prevent paper waste`);
+        for (const dupeId of dupeIds) {
+          try {
+            await supabase
+              .from('print_jobs')
+              .delete()
+              .eq('id', dupeId)
+              .eq('restaurant_id', restaurantId);
+            console.log(`📠 Duplicate removed: ${dupeId}`);
+          } catch (e) {
+            console.warn(`📠 Failed to remove duplicate ${dupeId}:`, e.message);
+          }
+        }
+      }
+
+      return Array.from(seen.values());
+    };
+
     // ===== Poll for pending jobs =====
     const fetchPendingJobs = async () => {
       if (!mountedRef.current) return;
@@ -186,8 +238,10 @@ export default function PrintListener() {
         setStatus('active');
 
         if (data && data.length > 0) {
-          console.log(`📠 Found ${data.length} pending job(s)`);
-          for (const job of data) {
+          // Deduplicate before processing — prevents same bill/KOT printing multiple times
+          const uniqueJobs = await deduplicateJobs(data);
+          console.log(`📠 Found ${data.length} pending → ${uniqueJobs.length} unique job(s)`);
+          for (const job of uniqueJobs) {
             if (!mountedRef.current) break;
             await executeJob(job);
           }

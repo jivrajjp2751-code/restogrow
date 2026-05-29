@@ -197,6 +197,68 @@ export async function createPrintJob(type, content) {
   if (!_restaurantId) throw new Error('No restaurant ID set. Please reload.');
   
   try {
+    // ===== DEDUPLICATION: Prevent duplicate print jobs (WiFi-down scenario) =====
+    // Check if an identical pending job already exists
+    try {
+      const { data: pendingJobs } = await supabase
+        .from('print_jobs')
+        .select('id, type, content, created_at')
+        .eq('restaurant_id', _restaurantId)
+        .eq('status', 'pending')
+        .eq('type', type)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (pendingJobs && pendingJobs.length > 0) {
+        let isDuplicate = false;
+
+        if (type === 'BILL') {
+          // For BILL: match by billNumber — same bill should never be queued twice
+          const newBillNo = content?.bill?.billNumber;
+          if (newBillNo) {
+            isDuplicate = pendingJobs.some(j => j.content?.bill?.billNumber === newBillNo);
+          }
+        } else if (type === 'KOT') {
+          // For KOT: match by order ID + item count + table label
+          const newOrderId = content?.order?.id;
+          const newTableLabel = content?.tableLabel;
+          const newItemCount = (content?.order?.items || []).length;
+          // Build a simple signature: item names sorted + quantities
+          const newItemSig = (content?.order?.items || [])
+            .map(i => `${i.name}:${i.quantity}`)
+            .sort()
+            .join('|');
+
+          if (newOrderId) {
+            isDuplicate = pendingJobs.some(j => {
+              const jOrderId = j.content?.order?.id;
+              const jTableLabel = j.content?.tableLabel;
+              const jItemCount = (j.content?.order?.items || []).length;
+              const jItemSig = (j.content?.order?.items || [])
+                .map(i => `${i.name}:${i.quantity}`)
+                .sort()
+                .join('|');
+              
+              // Same order, same table, same items = duplicate
+              return jOrderId === newOrderId && jTableLabel === newTableLabel && 
+                     jItemCount === newItemCount && jItemSig === newItemSig;
+            });
+          }
+        }
+
+        if (isDuplicate) {
+          console.warn(`📠 DUPLICATE BLOCKED: ${type} job already pending — skipping creation to prevent waste`);
+          // Return the existing job so the caller doesn't see an error
+          const existingJob = pendingJobs[0];
+          return existingJob;
+        }
+      }
+    } catch (dedupeErr) {
+      // Dedup check failed — proceed with insert anyway (better to have a duplicate than to block printing)
+      console.warn('📠 Dedup check failed (proceeding with insert):', dedupeErr.message);
+    }
+
+    // ===== INSERT =====
     const job = await dbInsert('print_jobs', {
       type,
       content,
@@ -206,7 +268,7 @@ export async function createPrintJob(type, content) {
     
     console.log(`📠 Print job created: ${type} [${job?.id}]`);
     
-    // Verify the job exists in the database (catches silent insert failures)
+    // Verify the job exists in the database
     try {
       const { data: verify } = await supabase
         .from('print_jobs')

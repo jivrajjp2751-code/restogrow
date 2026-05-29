@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Printer, X, Trash2, PauseCircle, PlayCircle, Trash, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Printer, X, Trash2, PauseCircle, PlayCircle, Trash, Eye, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { fetchPendingPrintJobs, cancelPrintJob, clearAllPendingPrintJobs } from '../store/data';
 import { useToast } from '../context/AppContext';
 
@@ -12,6 +12,39 @@ export default function PrintQueuePanel() {
   const [previewJob, setPreviewJob] = useState(null); // job to show full bill preview
   const { addToast } = useToast();
   const intervalRef = useRef(null);
+
+  // ===== Duplicate Detection =====
+  // Compute a content signature for each job to detect duplicates
+  const getJobSignature = useCallback((job) => {
+    if (job.type === 'BILL') {
+      const billNo = job.content?.bill?.billNumber;
+      return billNo ? `BILL:${billNo}` : `BILL:${job.id}`;
+    } else if (job.type === 'KOT') {
+      const orderId = job.content?.order?.id;
+      const tableLabel = job.content?.tableLabel || '';
+      const itemSig = (job.content?.order?.items || [])
+        .map(i => `${i.name}:${i.quantity}`)
+        .sort()
+        .join('|');
+      return orderId ? `KOT:${orderId}:${tableLabel}:${itemSig}` : `KOT:${job.id}`;
+    }
+    return `OTHER:${job.id}`;
+  }, []);
+
+  // Find which jobs are duplicates (keep the oldest, mark rest as dupes)
+  const { duplicateIds, duplicateCount } = useMemo(() => {
+    const sigMap = new Map(); // signature → first job id
+    const dupes = new Set();
+    for (const job of jobs) {
+      const sig = getJobSignature(job);
+      if (sigMap.has(sig)) {
+        dupes.add(job.id); // this is a duplicate
+      } else {
+        sigMap.set(sig, job.id);
+      }
+    }
+    return { duplicateIds: dupes, duplicateCount: dupes.size };
+  }, [jobs, getJobSignature]);
 
   const loadJobs = useCallback(async () => {
     try {
@@ -60,6 +93,27 @@ export default function PrintQueuePanel() {
       addToast('🧹 Queue cleared', 'success');
     } catch {
       addToast('Failed to clear queue', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Remove all duplicate jobs (keep oldest of each)
+  const handleRemoveDuplicates = async () => {
+    if (duplicateCount === 0) return;
+    setLoading(true);
+    try {
+      const idsToRemove = [...duplicateIds];
+      for (const id of idsToRemove) {
+        try {
+          await cancelPrintJob(id);
+        } catch { /* continue */ }
+      }
+      setJobs(prev => prev.filter(j => !duplicateIds.has(j.id)));
+      setExpandedJob(null);
+      addToast(`🧹 Removed ${idsToRemove.length} duplicate(s)`, 'success');
+    } catch {
+      addToast('Failed to remove duplicates', 'error');
     } finally {
       setLoading(false);
     }
@@ -160,6 +214,19 @@ export default function PrintQueuePanel() {
           </button>
         </div>
 
+        {/* Duplicate warning */}
+        {duplicateCount > 0 && (
+          <div className="pq-status-bar duplicate">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+              <AlertTriangle size={13} />
+              <span>{duplicateCount} duplicate{duplicateCount > 1 ? 's' : ''} detected</span>
+            </div>
+            <button className="pq-dedup-btn" onClick={handleRemoveDuplicates} disabled={loading}>
+              REMOVE DUPLICATES
+            </button>
+          </div>
+        )}
+
         {/* Status bar */}
         {isPaused && (
           <div className="pq-status-bar paused">
@@ -193,6 +260,9 @@ export default function PrintQueuePanel() {
                         )}
                         {info.billNumber && (
                           <span className="pq-job-billno"> #{info.billNumber}</span>
+                        )}
+                        {duplicateIds.has(job.id) && (
+                          <span className="pq-job-dupe-badge">DUPLICATE</span>
                         )}
                       </div>
                       <div className="pq-job-meta">
