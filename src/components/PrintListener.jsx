@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { useApp } from '../context/AppContext';
-import { markPrintJobDone } from '../store/data';
 import { printSplitKOT, printBillDirect } from '../utils/print';
 
 export default function PrintListener() {
@@ -36,14 +35,83 @@ export default function PrintListener() {
     console.log('📠 PrintListener ACTIVE — restaurant:', restaurantId);
     setStatus('active');
 
+    // ===== Safely mark a job as completed (handles already-deleted/missing rows) =====
+    const safeMarkDone = async (jobId) => {
+      if (!jobId) return;
+      try {
+        // First check if the job still exists
+        const { data: existing, error: checkErr } = await supabase
+          .from('print_jobs')
+          .select('id, status')
+          .eq('id', jobId)
+          .eq('restaurant_id', restaurantId)
+          .maybeSingle();
+
+        if (checkErr) {
+          console.warn('📠 Check job status failed (non-critical):', checkErr.message);
+          return;
+        }
+
+        // Job was already deleted (removed from queue panel) or doesn't exist
+        if (!existing) {
+          console.log(`📠 Job ${jobId} already removed — skipping mark-done`);
+          return;
+        }
+
+        // Job was already completed
+        if (existing.status === 'completed') {
+          console.log(`📠 Job ${jobId} already completed — skipping`);
+          return;
+        }
+
+        // Safe to update
+        const { error: updateErr } = await supabase
+          .from('print_jobs')
+          .update({ status: 'completed' })
+          .eq('id', jobId)
+          .eq('restaurant_id', restaurantId);
+
+        if (updateErr) {
+          console.warn('📠 Mark done update failed (non-critical):', updateErr.message);
+        }
+      } catch (err) {
+        // Completely swallow — marking done is never critical
+        console.warn('📠 safeMarkDone exception (non-critical):', err.message);
+      }
+    };
+
     // ===== Core job execution =====
     const executeJob = async (job) => {
+      if (!job || !job.id) return;
       if (processingRef.current.has(job.id)) return;
+
       // Respect pause state from Print Queue Panel
       if (localStorage.getItem('printingPaused') === 'true') {
         console.log('📠 Printing is PAUSED — skipping job', job.id);
         return;
       }
+
+      // Check if the job still exists before processing (user may have cancelled it)
+      try {
+        const { data: fresh, error: freshErr } = await supabase
+          .from('print_jobs')
+          .select('id, status')
+          .eq('id', job.id)
+          .eq('restaurant_id', restaurantId)
+          .maybeSingle();
+
+        if (freshErr || !fresh) {
+          console.log(`📠 Job ${job.id} no longer exists — skipping`);
+          return;
+        }
+        if (fresh.status !== 'pending') {
+          console.log(`📠 Job ${job.id} status is '${fresh.status}' — skipping`);
+          return;
+        }
+      } catch (e) {
+        console.warn('📠 Pre-check failed, proceeding anyway:', e.message);
+      }
+
       processingRef.current.add(job.id);
 
       console.log(`📄 Processing: ${job.type} [${job.id}]`);
@@ -54,32 +122,39 @@ export default function PrintListener() {
           const content = job.content;
           if (!content || !content.order) {
             console.error('❌ KOT job missing order data:', job.id);
-            await markPrintJobDone(job.id);
+            await safeMarkDone(job.id);
             return;
           }
-          const result = printSplitKOT(content.order, content.tableLabel, null, config);
-          console.log(`🍴 KOT: ${result.success ? 'PRINTED' : 'No dept match'}`);
+          try {
+            const result = printSplitKOT(content.order, content.tableLabel, null, config);
+            console.log(`🍴 KOT: ${result?.success ? 'PRINTED' : 'No dept match'}`);
+          } catch (printErr) {
+            console.error('❌ KOT print error (marking done to avoid loop):', printErr.message);
+          }
         } else if (job.type === 'BILL') {
           const content = job.content;
           if (!content || !content.bill) {
             console.error('❌ BILL job missing bill data:', job.id);
-            await markPrintJobDone(job.id);
+            await safeMarkDone(job.id);
             return;
           }
-          printBillDirect({ ...content.bill, currency: config.currency });
-          console.log('💵 Bill PRINTED');
+          try {
+            printBillDirect({ ...content.bill, currency: config.currency });
+            console.log('💵 Bill PRINTED');
+          } catch (printErr) {
+            console.error('❌ Bill print error (marking done to avoid loop):', printErr.message);
+          }
         } else {
           console.warn('⚠️ Unknown job type:', job.type);
         }
 
-        await markPrintJobDone(job.id);
+        await safeMarkDone(job.id);
         setJobCount(c => c + 1);
         console.log(`✅ Job ${job.id} done`);
       } catch (err) {
         console.error(`❌ Print FAILED [${job.id}]:`, err);
-        if (err.message?.includes('No bill') || err.message?.includes('No order')) {
-          await markPrintJobDone(job.id);
-        }
+        // Always mark done on failure to prevent infinite retry loop
+        await safeMarkDone(job.id);
       } finally {
         processingRef.current.delete(job.id);
       }
@@ -97,6 +172,12 @@ export default function PrintListener() {
           .order('created_at', { ascending: true });
 
         if (error) {
+          // Handle missing table gracefully
+          if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+            console.warn('📠 print_jobs table does not exist — printing disabled');
+            setStatus('error');
+            return;
+          }
           console.error('📠 Poll error:', error.message);
           setStatus('error');
           return;
@@ -107,6 +188,7 @@ export default function PrintListener() {
         if (data && data.length > 0) {
           console.log(`📠 Found ${data.length} pending job(s)`);
           for (const job of data) {
+            if (!mountedRef.current) break;
             await executeJob(job);
           }
         }
@@ -152,7 +234,9 @@ export default function PrintListener() {
     return () => {
       console.log('📠 PrintListener cleanup');
       clearInterval(intervalId);
-      if (channel) supabase.removeChannel(channel);
+      if (channel) {
+        try { supabase.removeChannel(channel); } catch (e) { /* cleanup error, safe to ignore */ }
+      }
     };
   }, [isPrintStation, currentUser, config]);
 

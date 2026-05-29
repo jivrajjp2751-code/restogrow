@@ -196,41 +196,64 @@ export async function addTable(data) {
 export async function createPrintJob(type, content) {
   if (!_restaurantId) throw new Error('No restaurant ID set. Please reload.');
   
-  const job = await dbInsert('print_jobs', {
-    type,
-    content,
-    status: 'pending',
-    created_at: new Date().toISOString()
-  });
-  
-  console.log(`📠 Print job created: ${type} [${job?.id}]`);
-  
-  // Verify the job exists in the database (catches silent insert failures)
   try {
-    const { data: verify } = await supabase
-      .from('print_jobs')
-      .select('id, status')
-      .eq('id', job.id)
-      .single();
+    const job = await dbInsert('print_jobs', {
+      type,
+      content,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    });
     
-    if (!verify) {
-      console.error('📠 Print job verification FAILED — job not found after insert');
-      throw new Error('Print job was not saved. Check your database connection.');
+    console.log(`📠 Print job created: ${type} [${job?.id}]`);
+    
+    // Verify the job exists in the database (catches silent insert failures)
+    try {
+      const { data: verify } = await supabase
+        .from('print_jobs')
+        .select('id, status')
+        .eq('id', job.id)
+        .maybeSingle();
+      
+      if (!verify) {
+        console.error('📠 Print job verification FAILED — job not found after insert');
+        throw new Error('Print job was not saved. Check your database connection.');
+      }
+      console.log(`📠 Print job verified: ${verify.id} status=${verify.status}`);
+    } catch (verifyErr) {
+      if (verifyErr.message?.includes('not saved')) throw verifyErr;
+      console.warn('📠 Verification query failed (non-critical):', verifyErr.message);
     }
-    console.log(`📠 Print job verified: ${verify.id} status=${verify.status}`);
-  } catch (verifyErr) {
-    if (verifyErr.message?.includes('not saved')) throw verifyErr;
-    console.warn('📠 Verification query failed (non-critical):', verifyErr.message);
+    
+    return job;
+  } catch (insertErr) {
+    // Handle missing table gracefully
+    if (insertErr.message?.includes('relation') && insertErr.message?.includes('does not exist')) {
+      console.warn('📠 print_jobs table does not exist — skipping print job creation');
+      return null;
+    }
+    throw insertErr;
   }
-  
-  return job;
 }
 
 export async function markPrintJobDone(jobId) {
-  if (!jobId) return;
+  if (!jobId || !_restaurantId) return;
   try {
+    // Check if the job still exists before updating (avoids errors when job was removed from queue)
+    const { data: existing } = await supabase
+      .from('print_jobs')
+      .select('id')
+      .eq('id', jobId)
+      .eq('restaurant_id', _restaurantId)
+      .maybeSingle();
+    
+    if (!existing) {
+      console.log('📠 Job already removed/completed — skipping mark-done:', jobId);
+      return;
+    }
+    
     await dbUpdate('print_jobs', jobId, { status: 'completed' });
   } catch (err) {
+    // Never throw — marking done is non-critical
     console.warn('📠 Failed to mark job done (non-critical):', err.message);
   }
 }
@@ -258,6 +281,19 @@ export async function fetchPendingPrintJobs() {
 export async function cancelPrintJob(jobId) {
   if (!jobId || !_restaurantId) return;
   try {
+    // Check if job still exists before deleting
+    const { data: existing } = await supabase
+      .from('print_jobs')
+      .select('id')
+      .eq('id', jobId)
+      .eq('restaurant_id', _restaurantId)
+      .maybeSingle();
+    
+    if (!existing) {
+      console.log('📠 Job already gone — nothing to cancel:', jobId);
+      return; // Already deleted/completed — not an error
+    }
+
     const { error } = await supabase
       .from('print_jobs')
       .delete()
@@ -265,6 +301,11 @@ export async function cancelPrintJob(jobId) {
       .eq('restaurant_id', _restaurantId);
     if (error) throw error;
   } catch (err) {
+    // Handle missing table gracefully
+    if (err.message?.includes('relation') && err.message?.includes('does not exist')) {
+      console.warn('📠 print_jobs table does not exist');
+      return;
+    }
     console.error('📠 cancelPrintJob failed:', err.message);
     throw err;
   }
@@ -278,7 +319,14 @@ export async function clearAllPendingPrintJobs() {
       .delete()
       .eq('restaurant_id', _restaurantId)
       .eq('status', 'pending');
-    if (error) throw error;
+    if (error) {
+      // Handle missing table gracefully
+      if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+        console.warn('📠 print_jobs table does not exist');
+        return;
+      }
+      throw error;
+    }
   } catch (err) {
     console.error('📠 clearAllPendingPrintJobs failed:', err.message);
     throw err;
