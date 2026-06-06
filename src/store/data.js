@@ -640,15 +640,38 @@ export async function generateBill(orderId, discount, localOrder = null) {
   const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
 
-  // 6. Find active session
+  // 6. Find active session — try both camelCase and snake_case column names
   let sessionId = null;
   try {
-    const { data: activeSessions } = await supabase
+    const { data: activeSessions, error: sessErr } = await supabase
       .from('sessions').select('id')
       .eq('restaurant_id', _restaurantId).eq('status', 'active')
       .order('startedAt', { ascending: false }).limit(1);
-    if (activeSessions && activeSessions.length > 0) sessionId = activeSessions[0].id;
-  } catch { /* non-critical */ }
+    if (!sessErr && activeSessions && activeSessions.length > 0) {
+      sessionId = activeSessions[0].id;
+    }
+  } catch { /* try snake_case fallback */ }
+
+  if (!sessionId) {
+    try {
+      const { data: activeSessions2 } = await supabase
+        .from('sessions').select('id')
+        .eq('restaurant_id', _restaurantId).eq('status', 'active')
+        .order('started_at', { ascending: false }).limit(1);
+      if (activeSessions2 && activeSessions2.length > 0) sessionId = activeSessions2[0].id;
+    } catch { /* non-critical */ }
+  }
+
+  // Last resort: fetch all active sessions without ordering
+  if (!sessionId) {
+    try {
+      const { data: activeSessions3 } = await supabase
+        .from('sessions').select('id')
+        .eq('restaurant_id', _restaurantId).eq('status', 'active')
+        .limit(1);
+      if (activeSessions3 && activeSessions3.length > 0) sessionId = activeSessions3[0].id;
+    } catch { /* non-critical */ }
+  }
 
   // 7. Insert bill record with fallback strategies
   const baseBillPayload = {
@@ -919,27 +942,63 @@ export async function addStock(menuItemId, qty, reason) {
 
 export async function startSession(startedBy) {
   // Ensure no other active sessions exist (auto-close them)
-  await supabase
-    .from('sessions')
-    .update({ status: 'ended', endedAt: new Date().toISOString(), endedBy: 'Auto-closed' })
-    .eq('status', 'active')
-    .eq('restaurant_id', _restaurantId);
+  // Try both camelCase and snake_case for endedAt
+  try {
+    await supabase
+      .from('sessions')
+      .update({ status: 'ended', endedAt: new Date().toISOString(), endedBy: 'Auto-closed' })
+      .eq('status', 'active')
+      .eq('restaurant_id', _restaurantId);
+  } catch {
+    try {
+      await supabase
+        .from('sessions')
+        .update({ status: 'ended', ended_at: new Date().toISOString(), ended_by: 'Auto-closed' })
+        .eq('status', 'active')
+        .eq('restaurant_id', _restaurantId);
+    } catch { /* non-critical */ }
+  }
 
-  return dbInsert('sessions', {
-    date: new Date().toLocaleDateString(),
-    startedAt: new Date().toISOString(),
-    startedBy,
-    status: 'active'
-  });
+  const now = new Date();
+  const isoNow = now.toISOString();
+  const dateStr = now.toISOString().split('T')[0]; // Store as YYYY-MM-DD for consistent filtering
+
+  // Try camelCase first, then snake_case
+  try {
+    return await dbInsert('sessions', {
+      date: dateStr,
+      startedAt: isoNow,
+      startedBy,
+      status: 'active'
+    });
+  } catch {
+    return await dbInsert('sessions', {
+      date: dateStr,
+      started_at: isoNow,
+      started_by: startedBy,
+      status: 'active'
+    });
+  }
 }
 
 export async function endSession(endedBy) {
+  const isoNow = new Date().toISOString();
+  // Try camelCase first
   const { error } = await supabase
     .from('sessions')
-    .update({ status: 'ended', endedAt: new Date().toISOString(), endedBy })
+    .update({ status: 'ended', endedAt: isoNow, endedBy })
     .eq('status', 'active')
     .eq('restaurant_id', _restaurantId);
-  if (error) throw error;
+  
+  if (error) {
+    // Fallback to snake_case
+    const { error: err2 } = await supabase
+      .from('sessions')
+      .update({ status: 'ended', ended_at: isoNow, ended_by: endedBy })
+      .eq('status', 'active')
+      .eq('restaurant_id', _restaurantId);
+    if (err2) throw err2;
+  }
 }
 
 export function subscribeToChanges(callback) {
@@ -997,17 +1056,28 @@ export function getSessionBills(session, bills) {
   if (!session || !bills) return [];
   
   const sessionId = session.id;
+  const sStart = new Date(session.startedAt || session.started_at);
+  const sEnd = session.endedAt || session.ended_at ? new Date(session.endedAt || session.ended_at) : new Date();
+  
+  // Guard against invalid session dates
+  const validStart = !isNaN(sStart.getTime());
+  const validEnd = !isNaN(sEnd.getTime());
   
   return bills.filter(b => {
     // Primary: match by sessionId
     if (b.sessionId && b.sessionId === sessionId) return true;
+    // Also check snake_case session_id
+    if (b.session_id && b.session_id === sessionId) return true;
     
     // Fallback: if bill has no sessionId, match by precise time window
-    const bDate = new Date(b.createdAt || b.created_at);
-    const sStart = new Date(session.startedAt);
-    const sEnd = session.endedAt ? new Date(session.endedAt) : new Date();
+    const billDateStr = b.createdAt || b.created_at;
+    if (!billDateStr) return false;
     
-    if (!b.sessionId && bDate >= sStart && bDate <= sEnd) return true;
+    const bDate = new Date(billDateStr);
+    if (isNaN(bDate.getTime())) return false;
+    
+    const billHasNoSession = !b.sessionId && !b.session_id;
+    if (billHasNoSession && validStart && validEnd && bDate >= sStart && bDate <= sEnd) return true;
     
     return false;
   });

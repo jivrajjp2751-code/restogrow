@@ -13,7 +13,8 @@ export default function SessionPage() {
   const [viewingSession, setViewingSession] = useState(null);
   const [expandedHistory, setExpandedHistory] = useState(false);
 
-  const pastSessions = (allSessions || []).filter(s => s.status === 'ended').reverse();
+  const pastSessions = (allSessions || []).filter(s => s.status === 'ended')
+    .sort((a, b) => new Date(b.startedAt || b.started_at || 0) - new Date(a.startedAt || a.started_at || 0));
   const displayedSessions = expandedHistory ? pastSessions : pastSessions.slice(0, 5);
 
   const handleStartSession = async () => {

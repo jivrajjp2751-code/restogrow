@@ -144,7 +144,9 @@ ${deptData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:cent
 </body></html>`;
   }
 
-  const endedSessions = sessions.filter(s => s.status === 'ended').reverse().slice(0, 30);
+  const endedSessions = sessions.filter(s => s.status === 'ended')
+    .sort((a, b) => new Date(b.startedAt || b.started_at || 0) - new Date(a.startedAt || a.started_at || 0))
+    .slice(0, 100);
 
   return (
     <div className="page-content">
@@ -179,11 +181,18 @@ ${deptData.map(([name, data]) => `<tr><td>${name}</td><td style="text-align:cent
           <select className="select" value={selectedSessionId} onChange={e => setSelectedSessionId(e.target.value)}
             style={{ width: '300px' }}>
             <option value="">— Select a session —</option>
-            {endedSessions.map(s => (
+            {endedSessions.map(s => {
+              const startDate = s.startedAt || s.started_at;
+              const endDate = s.endedAt || s.ended_at;
+              const displayDate = s.date || (startDate ? new Date(startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+              const startTime = startDate ? new Date(startDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
+              const endTime = endDate ? new Date(endDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
+              return (
               <option key={s.id} value={s.id}>
-                {s.date} — {s.startedBy} ({new Date(s.startedAt).toLocaleTimeString()} to {new Date(s.endedAt).toLocaleTimeString()})
+                {displayDate} — {s.startedBy || s.started_by || 'Unknown'} ({startTime} to {endTime})
               </option>
-            ))}
+              );
+            })}
           </select>
         </div>
       )}
