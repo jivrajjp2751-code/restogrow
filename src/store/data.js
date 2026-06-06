@@ -895,7 +895,24 @@ export async function removeOrderItem(orderId, itemId) {
 export async function updateConfig(updates) {
   for (const [id, value] of Object.entries(updates)) {
     const val = typeof value === 'string' ? value : JSON.stringify(value);
-    await supabase.from('config').upsert({ id, value: val, restaurant_id: _restaurantId });
+    
+    // Attempt secure update targeting ONLY this restaurant
+    const { data, error } = await supabase.from('config')
+      .update({ value: val })
+      .eq('id', id)
+      .eq('restaurant_id', _restaurantId)
+      .select();
+
+    // If update affected 0 rows, the key doesn't exist yet for this tenant
+    if (!error && (!data || data.length === 0)) {
+      try {
+        await supabase.from('config').insert({ id, value: val, restaurant_id: _restaurantId });
+      } catch (insertErr) {
+        console.warn(`Config insert failed for ${id} (possibly global PK constraint):`, insertErr.message);
+      }
+    } else if (error) {
+      console.warn(`Config update failed for ${id}:`, error.message);
+    }
   }
 }
 

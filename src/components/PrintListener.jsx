@@ -39,32 +39,8 @@ export default function PrintListener() {
     const safeMarkDone = async (jobId) => {
       if (!jobId) return;
       try {
-        // First check if the job still exists
-        const { data: existing, error: checkErr } = await supabase
-          .from('print_jobs')
-          .select('id, status')
-          .eq('id', jobId)
-          .eq('restaurant_id', restaurantId)
-          .maybeSingle();
-
-        if (checkErr) {
-          console.warn('📠 Check job status failed (non-critical):', checkErr.message);
-          return;
-        }
-
-        // Job was already deleted (removed from queue panel) or doesn't exist
-        if (!existing) {
-          console.log(`📠 Job ${jobId} already removed — skipping mark-done`);
-          return;
-        }
-
-        // Job was already completed
-        if (existing.status === 'completed') {
-          console.log(`📠 Job ${jobId} already completed — skipping`);
-          return;
-        }
-
-        // Safe to update
+        // Safe to update - skip redundant check to speed up processing
+        // The pre-check in executeJob already verified it's pending
         const { error: updateErr } = await supabase
           .from('print_jobs')
           .update({ status: 'completed' })
@@ -118,37 +94,40 @@ export default function PrintListener() {
       setLastJob({ type: job.type, id: job.id, time: new Date().toLocaleTimeString() });
 
       try {
+        // Mark the job as done BEFORE printing!
+        // This is CRITICAL because iframe.contentWindow.print() can block the JS thread (print dialog).
+        // If we wait until after printing to mark it done, the network request gets blocked,
+        // and the queue gets stuck or infinite loops.
+        await safeMarkDone(job.id);
+
         if (job.type === 'KOT') {
           const content = job.content;
           if (!content || !content.order) {
             console.error('❌ KOT job missing order data:', job.id);
-            await safeMarkDone(job.id);
             return;
           }
           try {
             const result = printSplitKOT(content.order, content.tableLabel, null, config);
             console.log(`🍴 KOT: ${result?.success ? 'PRINTED' : 'No dept match'}`);
           } catch (printErr) {
-            console.error('❌ KOT print error (marking done to avoid loop):', printErr.message);
+            console.error('❌ KOT print error:', printErr.message);
           }
         } else if (job.type === 'BILL') {
           const content = job.content;
           if (!content || !content.bill) {
             console.error('❌ BILL job missing bill data:', job.id);
-            await safeMarkDone(job.id);
             return;
           }
           try {
             printBillDirect({ ...content.bill, currency: config.currency });
             console.log('💵 Bill PRINTED');
           } catch (printErr) {
-            console.error('❌ Bill print error (marking done to avoid loop):', printErr.message);
+            console.error('❌ Bill print error:', printErr.message);
           }
         } else {
           console.warn('⚠️ Unknown job type:', job.type);
         }
 
-        await safeMarkDone(job.id);
         setJobCount(c => c + 1);
         console.log(`✅ Job ${job.id} done`);
       } catch (err) {
