@@ -35,7 +35,7 @@ export default function InventoryPage() {
     if (!stockModal || !addQty || Number(addQty) <= 0) { addToast('Enter valid qty', 'error'); return; }
     try {
       await addStock(stockModal.id, Number(addQty), 'Manual restock');
-      refresh();
+      refresh('inventory_log');
       addToast(`+${addQty} ${stockModal.unit} → ${stockModal.name}`, 'success');
       setStockModal(null);
       setAddQty('');
@@ -61,7 +61,7 @@ export default function InventoryPage() {
         buyingPrice: Number(newItemForm.buyingPrice) || 0,
         stock: newItemForm.isTracked ? (Number(newItemForm.stock) || 0) : -999,
       });
-      refresh();
+      refresh('menu_items');
       addToast(`${newItemForm.name} added`, 'success');
       setAddItemModal(null);
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
@@ -71,7 +71,7 @@ export default function InventoryPage() {
     if (!confirm(`Delete "${item.name}" from inventory? This cannot be undone.`)) return;
     try {
       await deleteMenuItem(item.id);
-      refresh();
+      refresh('menu_items');
       addToast(`${item.name} deleted`, 'info');
     } catch (e) { addToast('Delete failed: ' + e.message, 'error'); }
   };
@@ -101,7 +101,7 @@ export default function InventoryPage() {
         stock: editItemForm.isTracked ? (Number(editItemForm.stock) || 0) : -999,
         deptId: editItemModal.deptId,
       });
-      refresh();
+      refresh('menu_items');
       addToast(`${editItemForm.name} updated`, 'success');
       setEditItemModal(null);
     } catch (e) { addToast('Update failed: ' + e.message, 'error'); }

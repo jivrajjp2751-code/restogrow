@@ -38,7 +38,7 @@ export default function SettingsPage() {
     try { 
       await updateConfig({ ...form, billLayout }); 
       localStorage.setItem('isPrintStation', isPrintStation);
-      refresh(); 
+      refresh('config'); 
       addToast('Settings saved', 'success'); 
     }
     catch { addToast('Failed', 'error'); }

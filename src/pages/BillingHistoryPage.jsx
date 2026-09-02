@@ -31,7 +31,7 @@ export default function BillingHistoryPage() {
     setBusy(true);
     try {
       await settleBill(settleModal.id, settleMode);
-      await refresh();
+      await refresh('bills');
       addToast(`Bill ${settleModal.billNumber} settled via ${settleMode}`, 'success');
       setSettleModal(null);
     } catch (e) { addToast('Settlement failed: ' + e.message, 'error'); }

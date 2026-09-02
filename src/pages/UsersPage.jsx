@@ -19,13 +19,13 @@ export default function UsersPage() {
     try {
       if (modal === 'new') { await addUser(saveData); addToast('User created', 'success'); }
       else { await updateUser(modal.id, saveData); addToast('Updated', 'success'); }
-      setModal(null); refresh();
+      setModal(null); refresh('users');
     } catch (e) { addToast(e.message || 'Failed', 'error'); }
   };
   
   const handleDelete = async (id) => {
     if (id === currentUser?.id) { addToast("Can't delete yourself", 'error'); return; }
-    if (confirm('Delete?')) { try { await deleteUser(id); refresh(); } catch { addToast('Failed', 'error'); } }
+    if (confirm('Delete?')) { try { await deleteUser(id); refresh('users'); } catch { addToast('Failed', 'error'); } }
   };
 
   return (

@@ -77,7 +77,7 @@ export default function TablesPage() {
     const table = customerModal;
     try {
       await createOrder(table.id, table.label || `T${table.number}`, customerName);
-      refresh();
+      refresh('orders');
       addToast(`${table.label} — Order started`, 'success');
       setCustomerModal(null);
       setCustomerName('');
@@ -92,7 +92,7 @@ export default function TablesPage() {
     try {
       const { settleBill } = await import('../store/data');
       await settleBill(settleModal.id, settleMode);
-      await refresh();
+      await refresh('bills');
       addToast(`Bill ${settleModal.billNumber} settled via ${settleMode}`, 'success');
       setSettleModal(null);
     } catch (e) { addToast('Settlement failed: ' + e.message, 'error'); }
@@ -104,7 +104,7 @@ export default function TablesPage() {
     const sectionTables = getTablesForSection(sectionId);
     try {
       await addTable({ number: sectionTables.length + 1, label: newTableForm.label, seats: Number(newTableForm.seats) || 4, sectionId });
-      refresh();
+      refresh('tables');
       addToast(`Table ${newTableForm.label} added`, 'success');
       setAddTableModal(null);
       setNewTableForm({ label: '', seats: 4 });
@@ -115,7 +115,7 @@ export default function TablesPage() {
     const table = tables.find(t => t.id === tableId);
     if (table?.status === 'occupied') { addToast('Cannot delete occupied table', 'error'); return; }
     if (confirm('Delete this table?')) {
-      try { await deleteTable(tableId); refresh(); addToast('Table removed', 'info'); }
+      try { await deleteTable(tableId); refresh('tables'); addToast('Table removed', 'info'); }
       catch (e) { addToast(e.message || 'Failed', 'error'); }
     }
   };
@@ -124,7 +124,7 @@ export default function TablesPage() {
     if (!sectionForm.name) { addToast('Enter section name', 'error'); return; }
     try {
       await addSection(sectionForm);
-      refresh();
+      refresh('sections');
       addToast(`Section "${sectionForm.name}" added`, 'success');
       setSectionModal(null);
       setSectionForm({ name: '', icon: '🏠', color: '#00B894', surcharge: 0, surchargeDepts: [] });
@@ -149,7 +149,7 @@ export default function TablesPage() {
     } else {
       try {
         await updateSection(sectionModal.id, sectionForm);
-        refresh();
+        refresh('sections');
         addToast('Section updated', 'success');
         setSectionModal(null);
       } catch (e) { addToast(e.message || 'Failed', 'error'); }
@@ -164,7 +164,7 @@ export default function TablesPage() {
     }
     if (confirm('Delete this section and all its tables?')) {
       deleteSection(sectionId);
-      refresh();
+      refresh('sections');
       addToast('Section removed', 'info');
     }
   };

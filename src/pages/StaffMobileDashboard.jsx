@@ -67,7 +67,7 @@ export default function StaffMobileDashboard() {
     setBusy(true);
     try {
       await createOrder(customerModal.id, customerModal.label || `T${customerModal.number}`, customerName);
-      await refresh();
+      await refresh('orders');
       setSelectedTableId(customerModal.id);
       setCustomerModal(null);
       setCustomerName('');
