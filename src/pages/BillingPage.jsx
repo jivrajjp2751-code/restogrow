@@ -46,7 +46,7 @@ export default function BillingPage() {
         result.bill.billLayout = billLayout;
         result.bill.cashierName = currentUser?.name || currentUser?.email || '';
         setGeneratedBill(result.bill);
-        refresh();
+        refresh('bills');
         addToast('BILL GENERATED', 'success');
       }
       else addToast('Failed', 'error');
@@ -73,8 +73,8 @@ export default function BillingPage() {
     if (!confirm('Cancel this order? All items will be removed.')) return;
     setBusy(true);
     try {
-      await cancelOrder(order.id, order.tableId || order.table_id);
-      await refresh();
+      await cancelOrder(orderId, order?.tableId);
+      await refresh('orders');
       addToast('Order cancelled', 'info');
       navigate('/tables');
     } catch (e) { addToast('Cancel failed: ' + e.message, 'error'); }

@@ -20,8 +20,8 @@ export default function SessionPage() {
   const handleStartSession = async () => {
     try {
       await startSession(currentUser?.name || 'Admin');
-      await refresh();
-      addToast('✅ New session started! Good luck today.', 'success');
+      await refresh('sessions');
+      addToast('✨ New session started! Good luck today.', 'success');
     } catch (e) { addToast('Failed: ' + e.message, 'error'); }
   };
 
@@ -34,7 +34,7 @@ export default function SessionPage() {
 
     try {
       await endSession(currentUser?.name || 'Admin');
-      await refresh();
+      await refresh('sessions');
       setEndReport(report);
       setShowEndConfirm(false);
       addToast('Session ended. Daily report ready.', 'success');

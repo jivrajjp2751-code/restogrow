@@ -50,7 +50,7 @@ export default function OrderPage() {
       if (!existingOrder && table?.status === 'available') {
         await createOrder(tableId, table.label || `T${table.number}`);
         existingOrder = await getOrderForTable(tableId);
-        refresh();
+        refresh('orders');
       }
       setOrder(existingOrder);
     } catch {
@@ -168,7 +168,7 @@ export default function OrderPage() {
     setBusy(true);
     try {
       await cancelOrder(order.id, tableId);
-      await refresh();
+      await refresh('orders');
       addToast('Order cancelled', 'info');
       navigate('/tables');
     } catch (e) { addToast('Cancel failed: ' + e.message, 'error'); }
@@ -273,7 +273,7 @@ export default function OrderPage() {
             <button className="btn btn-secondary" onClick={handlePrintKOT}><Printer size={14}/> KOT</button>
             <button className="btn btn-success" onClick={async () => {
               setBusy(true);
-              try { await refresh(); } catch { /* ignore */ }
+              try { await refresh('orders'); } catch { /* ignore */ }
               setBusy(false);
               navigate(`/billing/${order.id}`);
             }} disabled={busy}>BILL</button>
