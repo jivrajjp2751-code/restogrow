@@ -58,6 +58,10 @@ async function fetchAll(table) {
       query = query.gte('createdAt', cutoffIso);
     } else if (table === 'sessions') {
       query = query.gte('started_at', cutoffIso);
+    } else if (table === 'bill_items') {
+      query = query.gte('created_at', cutoffIso);
+    } else if (table === 'inventory_log') {
+      query = query.gte('createdAt', cutoffIso);
     }
 
     const { data, error } = await query;
@@ -74,10 +78,11 @@ async function fetchAll(table) {
 export async function syncAll(changedTable = null) {
   if (!_restaurantId) return null;
   
-  let tableNames = ['tables', 'sections', 'menu_items', 'users', 'orders', 'order_items', 'bills', 'bill_items', 'sessions', 'config', 'inventory_log'];
+  // REMOVED 'order_items' from the blind parallel fetch list. We will fetch it smartly afterwards.
+  let tableNames = ['tables', 'sections', 'menu_items', 'users', 'orders', 'bills', 'bill_items', 'sessions', 'config', 'inventory_log'];
   
   if (changedTable) {
-    if (['orders', 'order_items'].includes(changedTable)) tableNames = ['orders', 'order_items'];
+    if (['orders', 'order_items'].includes(changedTable)) tableNames = ['orders']; 
     else if (['bills', 'bill_items'].includes(changedTable)) tableNames = ['bills', 'bill_items'];
     else tableNames = [changedTable];
   }
@@ -94,6 +99,33 @@ export async function syncAll(changedTable = null) {
     
     if (restRes.data) {
       results.restaurant = restRes.data;
+    }
+
+    // SMART FETCH: ONLY fetch order_items for the handful of currently active orders. 
+    // This entirely avoids downloading 20,000+ historical order_items on every button click!
+    let orderItemsData = [];
+    const activeOrdersRes = responses[tableNames.indexOf('orders')];
+    if (activeOrdersRes && activeOrdersRes.data && activeOrdersRes.data.length > 0) {
+      const activeOrderIds = activeOrdersRes.data.map(o => o.id);
+      
+      const { data } = await supabase.from('order_items')
+        .select('*')
+        .eq('restaurant_id', _restaurantId)
+        .in('order_id', activeOrderIds);
+        
+      if (data && data.length > 0) orderItemsData = data;
+      else {
+        const { data: data2 } = await supabase.from('order_items')
+          .select('*')
+          .eq('restaurant_id', _restaurantId)
+          .in('orderId', activeOrderIds);
+        if (data2) orderItemsData = data2;
+      }
+    }
+    
+    if (changedTable === null || ['orders', 'order_items'].includes(changedTable)) {
+      tableNames.push('order_items');
+      responses.push({ data: orderItemsData });
     }
 
     responses.forEach((res, index) => {
