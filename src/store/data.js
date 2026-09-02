@@ -840,20 +840,20 @@ export async function settleBill(billId, paymentMode) {
 export async function getOrderForTable(tableId) {
   if (!_restaurantId) return null;
   try {
-    // Try snake_case first (standard)
+    // Try camelCase first (matches our new imported schema!)
     let { data: orders, error: _error } = await supabase.from('orders')
       .select('*')
       .eq('restaurant_id', _restaurantId)
-      .eq('table_id', tableId)
+      .eq('tableId', tableId)
       .eq('status', 'active')
       .limit(1);
       
-    // If not found, try camelCase (legacy/custom)
+    // If not found, try snake_case fallback
     if (!orders || orders.length === 0) {
       const res = await supabase.from('orders')
         .select('*')
         .eq('restaurant_id', _restaurantId)
-        .eq('tableId', tableId)
+        .eq('table_id', tableId)
         .eq('status', 'active')
         .limit(1);
       orders = res.data;
@@ -866,17 +866,17 @@ export async function getOrderForTable(tableId) {
     order.id = order.id || order.order_id;
     order.tableId = order.tableId || order.table_id;
     
-    // Fetch items with dual-naming support
+    // Fetch items: try camelCase first
     let { data: items } = await supabase.from('order_items')
       .select('*')
-      .eq('order_id', order.id)
+      .eq('orderId', order.id)
       .eq('restaurant_id', _restaurantId);
 
     if (!items || items.length === 0) {
       try {
         const res = await supabase.from('order_items')
           .select('*')
-          .eq('orderId', order.id)
+          .eq('order_id', order.id)
           .eq('restaurant_id', _restaurantId);
         if (res.data && res.data.length > 0) items = res.data;
       } catch (e) { /* ignore */ }
