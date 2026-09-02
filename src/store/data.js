@@ -42,8 +42,19 @@ async function fetchAll(table) {
   let allData = [];
   let from = 0;
   let to = 999;
+  
+  // Performance optimization: Only download last 60 days of historical data to save massive bandwidth
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - 60);
+  const cutoffIso = cutoffDate.toISOString();
+
   while (true) {
-    const { data, error } = await supabase.from(table).select('*').eq('restaurant_id', _restaurantId).range(from, to);
+    let query = supabase.from(table).select('*').eq('restaurant_id', _restaurantId).range(from, to);
+    
+    if (table === 'bills' || table === 'orders') query = query.gte('createdAt', cutoffIso);
+    if (table === 'sessions') query = query.gte('started_at', cutoffIso);
+
+    const { data, error } = await query;
     if (error) return { error }; // DO NOT throw! Return error so syncAll can gracefully ignore missing tables.
     if (!data || data.length === 0) break;
     allData = allData.concat(data);
@@ -1018,10 +1029,17 @@ export async function endSession(endedBy) {
   }
 }
 
+let syncTimeout = null;
 export function subscribeToChanges(callback) {
   return supabase
     .channel('restogrow-changes')
-    .on('postgres_changes', { event: '*', schema: 'public' }, () => callback())
+    .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+      // Debounce the sync to prevent UI freezing when many rapid changes occur
+      if (syncTimeout) clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(() => {
+        callback();
+      }, 1500);
+    })
     .subscribe();
 }
 
