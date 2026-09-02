@@ -50,10 +50,17 @@ export default function TablesPage() {
       navigate(`/order/${table.id}`);
     } else if (table.status === 'billing') {
       // Find active bill for this table
-      const activeBill = bills.find(b => {
-         const o = orders.find(ord => ord.id === b.orderId);
-         return o && o.tableId === table.id && (!b.paymentMode || b.paymentMode === 'Unsettled');
-      });
+        const activeBill = bills.find(b => {
+           const isUnsettled = !b.paymentMode || b.paymentMode === 'Unsettled';
+           if (!isUnsettled) return false;
+           
+           const o = orders.find(ord => ord.id === b.orderId);
+           if (o) return o.tableId === table.id;
+           
+           // Fallback: If order is missing (because we only fetch active orders now), match by table label
+           const expectedLabel = table.label || `T${table.number}`;
+           return b.tableNumber === expectedLabel || b.tableNumber === table.label || b.tableNumber === table.number?.toString();
+        });
       if (activeBill) {
         setSettleModal(activeBill);
         setSettleMode('Cash');
