@@ -66,14 +66,14 @@ export function AppProvider({ children }) {
     }
   }, [tenantId, currentUser]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (changedTable = null) => {
     if (!getTenant()) {
       setLoading(false);
       return;
     }
     setRefreshing(true);
     try {
-      const result = await syncAll();
+      const result = await syncAll(changedTable);
       if (result) {
         setData(prev => {
           // Merge logic: only overwrite if result has data for that table
@@ -96,7 +96,7 @@ export function AppProvider({ children }) {
     loadData();
     let sub = null;
     if (getTenant()) {
-      sub = subscribeToChanges(() => loadData());
+      sub = subscribeToChanges((tableName) => loadData(tableName));
     }
     return () => { if (sub) sub.unsubscribe(); };
   }, [loadData, tenantId]);

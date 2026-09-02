@@ -51,8 +51,14 @@ async function fetchAll(table) {
   while (true) {
     let query = supabase.from(table).select('*').eq('restaurant_id', _restaurantId).range(from, to);
     
-    if (table === 'bills' || table === 'orders') query = query.gte('createdAt', cutoffIso);
-    if (table === 'sessions') query = query.gte('started_at', cutoffIso);
+    if (table === 'orders') {
+      // Massive performance boost: ONLY fetch active orders! History is saved in bills.
+      query = query.eq('status', 'active');
+    } else if (table === 'bills') {
+      query = query.gte('createdAt', cutoffIso);
+    } else if (table === 'sessions') {
+      query = query.gte('started_at', cutoffIso);
+    }
 
     const { data, error } = await query;
     if (error) return { error }; // DO NOT throw! Return error so syncAll can gracefully ignore missing tables.
@@ -65,10 +71,17 @@ async function fetchAll(table) {
   return { data: allData };
 }
 
-export async function syncAll() {
+export async function syncAll(changedTable = null) {
   if (!_restaurantId) return null;
   
-  const tableNames = ['tables', 'sections', 'menu_items', 'users', 'orders', 'order_items', 'bills', 'bill_items', 'sessions', 'config', 'inventory_log'];
+  let tableNames = ['tables', 'sections', 'menu_items', 'users', 'orders', 'order_items', 'bills', 'bill_items', 'sessions', 'config', 'inventory_log'];
+  
+  if (changedTable) {
+    if (['orders', 'order_items'].includes(changedTable)) tableNames = ['orders', 'order_items'];
+    else if (['bills', 'bill_items'].includes(changedTable)) tableNames = ['bills', 'bill_items'];
+    else tableNames = [changedTable];
+  }
+  
   const results = {};
 
   try {
@@ -1033,11 +1046,11 @@ let syncTimeout = null;
 export function subscribeToChanges(callback) {
   return supabase
     .channel('restogrow-changes')
-    .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+    .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
       // Debounce the sync to prevent UI freezing when many rapid changes occur
       if (syncTimeout) clearTimeout(syncTimeout);
       syncTimeout = setTimeout(() => {
-        callback();
+        callback(payload.table);
       }, 1500);
     })
     .subscribe();
