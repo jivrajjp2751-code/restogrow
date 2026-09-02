@@ -261,8 +261,8 @@ export default function PrintListener() {
       console.warn('📠 Realtime setup failed (using polling only):', rtErr.message);
     }
 
-    // 3. Polling fallback every 3 seconds
-    const intervalId = setInterval(fetchPendingJobs, 3000);
+    // 3. Polling fallback every 60 seconds (saves massive bandwidth)
+    const intervalId = setInterval(fetchPendingJobs, 60000);
 
     return () => {
       console.log('📠 PrintListener cleanup');
