@@ -501,12 +501,11 @@ export async function cancelOrder(orderId, tableId) {
   
   // 2. Clear ALL active orders for this table to prevent it from going "Occupied" again
   if (tableId && _restaurantId) {
-    // Try both tableId and table_id
     await supabase.from('orders')
       .update({ status: 'cancelled' })
       .eq('restaurant_id', _restaurantId)
       .eq('status', 'active')
-      .or(`tableId.eq.${tableId},table_id.eq.${tableId}`);
+      .eq('tableId', tableId); // Use exact tableId
       
     // 3. Mark table as available
     await dbUpdate('tables', tableId, { status: 'available' });
@@ -597,36 +596,23 @@ export async function generateBill(orderId, discount, localOrder = null) {
   const orderTableId = order.tableId || order.table_id;
   const orderTableLabel = order.tableLabel || order.table_label || order.tableNumber || order.table_number || '';
 
-  // 2. Fetch order items — try BOTH column names safely with try/catch
+  // 2. Fetch order items (exact column only, no fallback guesswork)
   let items = [];
   try {
-    const res1 = await supabase.from('order_items').select('*').eq('orderId', orderId).eq('restaurant_id', _restaurantId);
+    const res1 = await supabase.from('order_items').select('*').eq('order_id', orderId).eq('restaurant_id', _restaurantId);
     if (res1.data && res1.data.length > 0) items = res1.data;
-  } catch (e) { console.warn('orderId query failed:', e.message); }
+  } catch (e) { console.warn('order_id query failed:', e.message); }
 
   if (items.length === 0) {
     try {
-      const res2 = await supabase.from('order_items').select('*').eq('order_id', orderId).eq('restaurant_id', _restaurantId);
+      const res2 = await supabase.from('order_items').select('*').eq('orderId', orderId).eq('restaurant_id', _restaurantId);
       if (res2.data && res2.data.length > 0) items = res2.data;
-    } catch (e) { console.warn('order_id query failed:', e.message); }
+    } catch (e) { console.warn('orderId query failed:', e.message); }
   }
 
-  // 3. Last resort: fetch ALL order_items for this restaurant and filter client-side
-  if (items.length === 0) {
-    try {
-      const res3 = await fetchAll('order_items');
-      if (res3.data) {
-        items = res3.data.filter(i =>
-          i.orderId === orderId || i.order_id === orderId ||
-          i.orderid === orderId || i.OrderId === orderId
-        );
-      }
-    } catch (e) { console.warn('Fallback order_items query failed:', e.message); }
-  }
-
-  // 4. Final fallback: use items from the locally cached order
+  // 3. Final fallback: use items from the locally cached order
   if (items.length === 0 && localOrder && localOrder.items && localOrder.items.length > 0) {
-    console.warn('⚠️ generateBill: Using locally cached items (all Supabase queries failed)');
+    console.warn('⚡ generateBill: Using locally cached items (Supabase queries failed)');
     items = localOrder.items;
   }
 
@@ -664,25 +650,25 @@ export async function generateBill(orderId, discount, localOrder = null) {
   const billId = getUUID();
   const billNumber = `BILL-${Date.now().toString().slice(-6)}`;
 
-  // 6. Find active session — try both camelCase and snake_case column names
+  // 6. Find active session (snake_case first for imported schema)
   let sessionId = null;
   try {
-    const { data: activeSessions, error: sessErr } = await supabase
+    const { data: activeSessions2, error: sessErr } = await supabase
       .from('sessions').select('id')
       .eq('restaurant_id', _restaurantId).eq('status', 'active')
-      .order('startedAt', { ascending: false }).limit(1);
-    if (!sessErr && activeSessions && activeSessions.length > 0) {
-      sessionId = activeSessions[0].id;
-    }
-  } catch { /* try snake_case fallback */ }
+      .order('started_at', { ascending: false }).limit(1);
+    if (!sessErr && activeSessions2 && activeSessions2.length > 0) sessionId = activeSessions2[0].id;
+  } catch { /* try camelCase fallback */ }
 
   if (!sessionId) {
     try {
-      const { data: activeSessions2 } = await supabase
+      const { data: activeSessions } = await supabase
         .from('sessions').select('id')
         .eq('restaurant_id', _restaurantId).eq('status', 'active')
-        .order('started_at', { ascending: false }).limit(1);
-      if (activeSessions2 && activeSessions2.length > 0) sessionId = activeSessions2[0].id;
+        .order('startedAt', { ascending: false }).limit(1);
+      if (activeSessions && activeSessions.length > 0) {
+        sessionId = activeSessions[0].id;
+      }
     } catch { /* non-critical */ }
   }
 
@@ -983,18 +969,18 @@ export async function addStock(menuItemId, qty, reason) {
 
 export async function startSession(startedBy) {
   // Ensure no other active sessions exist (auto-close them)
-  // Try both camelCase and snake_case for endedAt
+  // Try snake_case first (matches confirmed db schema)
   try {
     await supabase
       .from('sessions')
-      .update({ status: 'ended', endedAt: new Date().toISOString(), endedBy: 'Auto-closed' })
+      .update({ status: 'ended', ended_at: new Date().toISOString(), ended_by: 'Auto-closed' })
       .eq('status', 'active')
       .eq('restaurant_id', _restaurantId);
   } catch {
     try {
       await supabase
         .from('sessions')
-        .update({ status: 'ended', ended_at: new Date().toISOString(), ended_by: 'Auto-closed' })
+        .update({ status: 'ended', endedAt: new Date().toISOString(), endedBy: 'Auto-closed' })
         .eq('status', 'active')
         .eq('restaurant_id', _restaurantId);
     } catch { /* non-critical */ }
@@ -1002,21 +988,21 @@ export async function startSession(startedBy) {
 
   const now = new Date();
   const isoNow = now.toISOString();
-  const dateStr = now.toISOString().split('T')[0]; // Store as YYYY-MM-DD for consistent filtering
+  const dateStr = now.toISOString().split('T')[0];
 
-  // Try camelCase first, then snake_case
+  // Try snake_case first
   try {
     return await dbInsert('sessions', {
       date: dateStr,
-      startedAt: isoNow,
-      startedBy,
+      started_at: isoNow,
+      started_by: startedBy,
       status: 'active'
     });
   } catch {
     return await dbInsert('sessions', {
       date: dateStr,
-      started_at: isoNow,
-      started_by: startedBy,
+      startedAt: isoNow,
+      startedBy,
       status: 'active'
     });
   }
@@ -1024,18 +1010,18 @@ export async function startSession(startedBy) {
 
 export async function endSession(endedBy) {
   const isoNow = new Date().toISOString();
-  // Try camelCase first
+  // Try snake_case first
   const { error } = await supabase
     .from('sessions')
-    .update({ status: 'ended', endedAt: isoNow, endedBy })
+    .update({ status: 'ended', ended_at: isoNow, ended_by: endedBy })
     .eq('status', 'active')
     .eq('restaurant_id', _restaurantId);
   
   if (error) {
-    // Fallback to snake_case
+    // Fallback to camelCase
     const { error: err2 } = await supabase
       .from('sessions')
-      .update({ status: 'ended', ended_at: isoNow, ended_by: endedBy })
+      .update({ status: 'ended', endedAt: isoNow, endedBy: endedBy })
       .eq('status', 'active')
       .eq('restaurant_id', _restaurantId);
     if (err2) throw err2;
